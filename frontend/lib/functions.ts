@@ -1,0 +1,69 @@
+import { httpsCallable, FunctionsError } from "firebase/functions";
+import { functions } from "./firebaseClient";
+import type { EventSummary, Registration, RegisterForEventResult, CheckInResult } from "./types";
+
+export function getCallableErrorMessage(err: unknown): string {
+  if (err instanceof FunctionsError) {
+    return err.message;
+  }
+  return "Something went wrong. Please try again.";
+}
+
+export async function getPublishedEvents(): Promise<EventSummary[]> {
+  const call = httpsCallable<void, { events: EventSummary[] }>(functions, "getPublishedEvents");
+  const { data } = await call();
+  return data.events;
+}
+
+export async function getEvent(slug: string): Promise<EventSummary> {
+  const call = httpsCallable<{ slug: string }, { event: EventSummary }>(functions, "getEvent");
+  const { data } = await call({ slug });
+  return data.event;
+}
+
+export async function registerForEvent(input: {
+  eventId: string;
+  name: string;
+  phone: string;
+  email: string;
+}): Promise<RegisterForEventResult> {
+  const call = httpsCallable<typeof input, RegisterForEventResult>(functions, "registerForEvent");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function searchRegistrations(input: {
+  eventId: string;
+  query: string;
+}): Promise<Registration[]> {
+  const call = httpsCallable<typeof input, { registrations: Registration[] }>(
+    functions,
+    "searchRegistrations"
+  );
+  const { data } = await call(input);
+  return data.registrations;
+}
+
+export async function checkInByQr(input: {
+  eventId: string;
+  qrValue: string;
+}): Promise<CheckInResult> {
+  const call = httpsCallable<typeof input, CheckInResult>(functions, "checkInByQr");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function checkInByRegistrationId(input: {
+  eventId: string;
+  registrationId: string;
+}): Promise<CheckInResult> {
+  const call = httpsCallable<typeof input, CheckInResult>(functions, "checkInByRegistrationId");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function triggerManualReminder(input: { eventId: string }): Promise<{ sent: number }> {
+  const call = httpsCallable<typeof input, { sent: number }>(functions, "triggerManualReminder");
+  const { data } = await call(input);
+  return data;
+}

@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// All reads/writes to events and registrations go through Cloud Functions
+// using the Admin SDK, which bypasses these rules entirely. The frontend
+// only ever talks to Firestore indirectly (via callable functions) — the
+// only direct Firestore client usage is none; Firebase Auth handles staff
+// sign-in separately. Deny all direct client access as defense in depth.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
