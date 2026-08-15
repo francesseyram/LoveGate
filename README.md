@@ -1,4 +1,4 @@
-# Love Inc Ticketing
+# LoveGate
 
 A reusable event registration + check-in system for Love Inc. Every event gets its own hand-built,
 themed page; registering issues one free QR ticket, emailed and shown on screen; front-desk staff
