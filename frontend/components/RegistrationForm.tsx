@@ -101,16 +101,16 @@ export function RegistrationForm({
   const isRevive = theme === "revive";
 
   const cardClass = isRevive
-    ? "w-full max-w-[680px] rounded-[20px] border border-gold/35 bg-[linear-gradient(155deg,rgba(58,15,18,0.92),rgba(13,7,5,0.97))] p-9 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.6)] font-[family-name:var(--font-oswald)] box-border sm:p-11"
-    : "w-full max-w-[680px] rounded-[20px] border border-charcoal/12 bg-white p-9 shadow-[0_20px_40px_-20px_rgba(178,58,72,0.25)] box-border sm:p-11";
+    ? "w-full max-w-[760px] rounded-[20px] border border-gold/35 bg-[linear-gradient(155deg,rgba(58,15,18,0.92),rgba(13,7,5,0.97))] p-9 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.6)] font-[family-name:var(--font-oswald)] box-border sm:p-11"
+    : "w-full max-w-[760px] rounded-[20px] border border-charcoal/12 bg-white p-9 shadow-[0_20px_40px_-20px_rgba(178,58,72,0.25)] box-border sm:p-11";
 
   const labelClass = isRevive
-    ? "text-[13px] font-semibold tracking-[0.08em] text-gold/85 uppercase"
-    : "text-[13px] font-semibold tracking-wide text-charcoal/60 uppercase";
+    ? "text-[14px] font-semibold tracking-[0.08em] text-gold/85 uppercase"
+    : "text-[14px] font-semibold tracking-wide text-charcoal/60 uppercase";
 
   const inputClass = isRevive
-    ? "h-14 w-full rounded-[10px] border-[1.5px] border-gold/40 bg-cream/[0.06] px-4 font-sans text-base text-cream outline-none focus:border-gold focus:ring-[3px] focus:ring-gold/25"
-    : "h-14 w-full rounded-[10px] border-[1.5px] border-charcoal/18 bg-cream px-4 font-sans text-base text-charcoal outline-none focus:border-coral focus:ring-[3px] focus:ring-coral/15";
+    ? "h-[60px] w-full rounded-[10px] border-[1.5px] border-gold/40 bg-cream/[0.06] px-4 font-sans text-[17px] text-cream outline-none focus:border-gold focus:ring-[3px] focus:ring-gold/25"
+    : "h-[60px] w-full rounded-[10px] border-[1.5px] border-charcoal/18 bg-cream px-4 font-sans text-[17px] text-charcoal outline-none focus:border-coral focus:ring-[3px] focus:ring-coral/15";
 
   const bannerClass = isRevive
     ? "mb-6 rounded-[10px] border border-coral/45 bg-coral/18 px-4 py-3 font-sans text-[13px] leading-snug text-[#F2C1C6]"
@@ -155,8 +155,8 @@ export function RegistrationForm({
           <h3
             className={
               isRevive
-                ? "mb-1.5 text-[32px] font-semibold tracking-wide text-cream uppercase"
-                : "mb-1.5 font-display text-[32px] font-bold text-charcoal"
+                ? "mb-2 text-[36px] font-semibold tracking-wide text-cream uppercase"
+                : "mb-2 font-display text-[36px] font-bold text-charcoal"
             }
           >
             Get your ticket
@@ -164,8 +164,8 @@ export function RegistrationForm({
           <p
             className={
               isRevive
-                ? "mb-7 text-[15px] tracking-wide text-cream/60"
-                : "mb-7 text-[15px] text-charcoal/65"
+                ? "mb-8 text-[16px] tracking-wide text-cream/60"
+                : "mb-8 text-[16px] text-charcoal/65"
             }
           >
             {eventName}
@@ -287,8 +287,8 @@ export function RegistrationForm({
             disabled={submitting}
             className={
               isRevive
-                ? "mt-8 h-14 w-full rounded-xl bg-[linear-gradient(135deg,#D9A441,#B23A48)] text-[17px] font-bold tracking-wide text-[#1A0D0A] uppercase shadow-[0_12px_24px_-8px_rgba(217,164,65,0.4)] transition hover:brightness-[1.08] active:translate-y-px active:shadow-none disabled:opacity-50"
-                : "mt-8 h-14 w-full rounded-xl bg-coral font-display text-lg font-bold text-cream shadow-[0_10px_20px_-8px_rgba(178,58,72,0.5)] transition hover:bg-coral-dark active:translate-y-px active:shadow-none disabled:opacity-50"
+                ? "mt-8 h-[60px] w-full rounded-xl bg-[linear-gradient(135deg,#D9A441,#B23A48)] text-[18px] font-bold tracking-wide text-[#1A0D0A] uppercase shadow-[0_12px_24px_-8px_rgba(217,164,65,0.4)] transition hover:brightness-[1.08] active:translate-y-px active:shadow-none disabled:opacity-50"
+                : "mt-8 h-[60px] w-full rounded-xl bg-coral font-display text-[19px] font-bold text-cream shadow-[0_10px_20px_-8px_rgba(178,58,72,0.5)] transition hover:bg-coral-dark active:translate-y-px active:shadow-none disabled:opacity-50"
             }
           >
             {submitting ? "Getting your ticket…" : "Get ticket"}
