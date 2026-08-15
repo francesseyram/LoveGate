@@ -13,18 +13,26 @@ interface RegisterInput {
   name: string;
   phone: string;
   email: string;
+  dob: string;
+  school: string;
+  level: string;
+  whatsapp?: string;
 }
 
 export const registerForEvent = onCall<RegisterInput>(
   { secrets: [RESEND_API_KEY] },
   async (request) => {
-    const { eventId, name, phone, email } = request.data ?? ({} as RegisterInput);
+    const { eventId, name, phone, email, dob, school, level, whatsapp } =
+      request.data ?? ({} as RegisterInput);
 
     if (!eventId || typeof eventId !== "string") {
       throw new HttpsError("invalid-argument", "eventId is required");
     }
     const trimmedName = (name ?? "").trim();
     const trimmedEmail = (email ?? "").trim();
+    const trimmedDob = (dob ?? "").trim();
+    const trimmedSchool = (school ?? "").trim();
+    const trimmedLevel = (level ?? "").trim();
     if (!trimmedName) {
       throw new HttpsError("invalid-argument", "name is required");
     }
@@ -35,6 +43,16 @@ export const registerForEvent = onCall<RegisterInput>(
     if (normalizedPhone.length < 7) {
       throw new HttpsError("invalid-argument", "a valid phone number is required");
     }
+    if (!trimmedDob) {
+      throw new HttpsError("invalid-argument", "date of birth is required");
+    }
+    if (!trimmedSchool) {
+      throw new HttpsError("invalid-argument", "school is required");
+    }
+    if (!trimmedLevel) {
+      throw new HttpsError("invalid-argument", "level is required");
+    }
+    const normalizedWhatsapp = whatsapp?.trim() ? normalizePhone(whatsapp) : normalizedPhone;
 
     const eventSnap = await db.collection("events").doc(eventId).get();
     if (!eventSnap.exists) {
@@ -71,6 +89,10 @@ export const registerForEvent = onCall<RegisterInput>(
       nameLower: trimmedName.toLowerCase(),
       phone: normalizedPhone,
       email: trimmedEmail,
+      dob: trimmedDob,
+      school: trimmedSchool,
+      level: trimmedLevel,
+      whatsapp: normalizedWhatsapp,
       qrValue,
       status: "going",
       registeredAt: Timestamp.now(),

@@ -20,6 +20,10 @@ export interface RegistrationDoc {
   nameLower: string;
   phone: string;
   email: string;
+  dob: string;
+  school: string;
+  level: string;
+  whatsapp: string;
   qrValue: string;
   status: RegistrationStatus;
   registeredAt: Timestamp;
@@ -44,6 +48,10 @@ export interface RegistrationDTO {
   name: string;
   phone: string;
   email: string;
+  dob: string;
+  school: string;
+  level: string;
+  whatsapp: string;
   qrValue: string;
   status: RegistrationStatus;
   registeredAt: string;
@@ -70,6 +78,10 @@ export function registrationToDTO(id: string, doc: RegistrationDoc): Registratio
     name: doc.name,
     phone: doc.phone,
     email: doc.email,
+    dob: doc.dob,
+    school: doc.school,
+    level: doc.level,
+    whatsapp: doc.whatsapp,
     qrValue: doc.qrValue,
     status: doc.status,
     registeredAt: doc.registeredAt.toDate().toISOString(),

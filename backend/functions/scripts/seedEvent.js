@@ -12,7 +12,8 @@ const db = admin.firestore();
 
 async function main() {
   const slug = "revive";
-  const startsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  // 6:30 PM in Accra, which is UTC+0 year-round (no DST).
+  const startsAt = new Date("2026-08-22T18:30:00Z");
 
   const existing = await db.collection("events").where("slug", "==", slug).limit(1).get();
   const ref = existing.empty ? db.collection("events").doc() : existing.docs[0].ref;
@@ -20,10 +21,11 @@ async function main() {
   await ref.set({
     name: "Revive",
     slug,
-    description: "An evening of worship, community, and renewal.",
+    description:
+      "Revive is a night of worship and prayer, open to the whole campus community. Come ready to encounter God and leave carrying a fire that doesn't go out.",
     coverPhotoUrl: "/events/revive/cover.jpg",
     startsAt: admin.firestore.Timestamp.fromDate(startsAt),
-    location: "Love Inc Main Campus",
+    location: "Anglican Church, University of Ghana",
     status: "published",
   });
 

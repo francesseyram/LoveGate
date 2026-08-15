@@ -51,24 +51,35 @@ export function CheckinSearch({ eventId }: { eventId: string }) {
         placeholder="Search by name…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        className="w-full rounded-[10px] border-[1.5px] border-gold/40 bg-cream/[0.06] px-4 py-3 font-sans text-[15px] text-cream placeholder:text-cream/35 outline-none focus:border-gold"
       />
-      {message && <p className="mt-3 text-sm text-green-700">{message}</p>}
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-      <ul className="mt-4 divide-y divide-gray-100 rounded-md border border-gray-200">
+      {message && (
+        <p className="mt-3 flex items-center gap-2 rounded-[10px] border border-sage/35 bg-sage/15 px-4 py-2.5 text-sm text-sage">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-sage" />
+          {message}
+        </p>
+      )}
+      {error && (
+        <p className="mt-3 rounded-[10px] border border-coral/40 bg-coral/15 px-4 py-2.5 text-sm text-[#F2C1C6]">
+          {error}
+        </p>
+      )}
+      <ul className="mt-4 divide-y divide-cream/10 overflow-hidden rounded-[10px] border border-cream/12 bg-cream/[0.04]">
         {results.map((registration) => (
-          <li key={registration.id} className="flex items-center justify-between px-4 py-3">
+          <li key={registration.id} className="flex items-center justify-between px-4 py-3.5">
             <div>
-              <p className="text-sm font-medium text-gray-900">{registration.name}</p>
-              <p className="text-xs text-gray-500">{registration.email}</p>
+              <p className="text-[15px] font-medium text-cream">{registration.name}</p>
+              <p className="text-[13px] text-cream/50">{registration.email}</p>
             </div>
             {registration.status === "checked_in" ? (
-              <span className="text-xs font-medium text-green-700">Checked in</span>
+              <span className="rounded-full border border-sage/35 bg-sage/15 px-3 py-1 text-[0.65rem] font-semibold tracking-wide text-sage uppercase">
+                Checked in
+              </span>
             ) : (
               <button
                 onClick={() => handleCheckIn(registration)}
                 disabled={busyId === registration.id}
-                className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                className="rounded-md bg-gold px-3.5 py-1.5 text-xs font-semibold text-[#1A0D0A] hover:brightness-105 disabled:opacity-50"
               >
                 {busyId === registration.id ? "Checking in…" : "Check in"}
               </button>
@@ -76,7 +87,7 @@ export function CheckinSearch({ eventId }: { eventId: string }) {
           </li>
         ))}
         {query.trim() && results.length === 0 && (
-          <li className="px-4 py-3 text-sm text-gray-500">No matches.</li>
+          <li className="px-4 py-3.5 text-sm text-cream/45">No matches.</li>
         )}
       </ul>
     </div>

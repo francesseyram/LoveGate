@@ -26,6 +26,10 @@ export async function registerForEvent(input: {
   name: string;
   phone: string;
   email: string;
+  dob: string;
+  school: string;
+  level: string;
+  whatsapp?: string;
 }): Promise<RegisterForEventResult> {
   const call = httpsCallable<typeof input, RegisterForEventResult>(functions, "registerForEvent");
   const { data } = await call(input);

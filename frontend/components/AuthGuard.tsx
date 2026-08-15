@@ -16,7 +16,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">
+      <div className="flex min-h-screen items-center justify-center bg-cream text-sm text-charcoal/60">
         Checking sign-in…
       </div>
     );

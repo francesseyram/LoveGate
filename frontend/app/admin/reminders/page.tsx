@@ -35,22 +35,25 @@ function ReminderTool() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-4 py-8">
-      <h1 className="text-xl font-semibold text-gray-900">Send reminder emails</h1>
-      <p className="mt-1 text-sm text-gray-500">
+    <main className="mx-auto min-h-screen max-w-xl bg-cream px-4 py-8 text-charcoal">
+      <h1 className="font-display text-xl font-bold">Send reminder emails</h1>
+      <p className="mt-1 text-sm text-charcoal/65">
         Sends a reminder email right now to every registrant still marked &quot;going&quot; for the
         selected event.
       </p>
 
       <div className="mt-6">
-        <label className="block text-sm font-medium text-gray-700" htmlFor="event-select">
+        <label
+          className="block text-xs font-semibold tracking-wide text-charcoal/60 uppercase"
+          htmlFor="event-select"
+        >
           Event
         </label>
         <select
           id="event-select"
           value={eventId}
           onChange={(e) => setEventId(e.target.value)}
-          className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="mt-1.5 w-full rounded-md border border-charcoal/15 bg-white px-3 py-2 text-sm text-charcoal"
         >
           {events.map((event) => (
             <option key={event.id} value={event.id}>
@@ -63,15 +66,20 @@ function ReminderTool() {
       <button
         onClick={handleSend}
         disabled={!eventId || sending}
-        className="mt-6 rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="mt-6 rounded-xl bg-coral px-4 py-2.5 font-display text-sm font-bold text-cream transition hover:bg-coral-dark disabled:opacity-50"
       >
         {sending ? "Sending…" : "Send reminder now"}
       </button>
 
       {message && (
-        <p className="mt-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">{message}</p>
+        <p className="mt-4 flex items-center gap-2 rounded-md bg-sage-tint px-4 py-3 text-sm font-medium text-sage-dark">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-sage-dark" />
+          {message}
+        </p>
       )}
-      {error && <p className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p className="mt-4 rounded-md bg-charcoal/5 px-4 py-3 text-sm text-coral">{error}</p>
+      )}
     </main>
   );
 }

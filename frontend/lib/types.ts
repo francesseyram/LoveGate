@@ -18,6 +18,10 @@ export interface Registration {
   name: string;
   phone: string;
   email: string;
+  dob: string;
+  school: string;
+  level: string;
+  whatsapp: string;
   qrValue: string;
   status: RegistrationStatus;
   registeredAt: string;
