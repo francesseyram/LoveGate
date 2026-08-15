@@ -6,17 +6,26 @@ import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
 const ELEMENT_ID = "qr-reader";
 
 /**
- * The browser itself (not our code) rejects a <video>.play() promise when its
- * element is removed from the DOM while play() is still pending — expected,
- * documented behavior (see the Chrome error's own help link), unavoidable
- * whenever this camera-owning component unmounts mid-start, and thrown deep
- * inside html5-qrcode's internals where we have no promise to catch. Mark
- * just this one known-benign rejection as handled so it doesn't surface as a
- * scary "unhandled" error; anything else still propagates normally.
+ * html5-qrcode's start() opens by wiping the container (`innerHTML = ""`), and
+ * the <video> it then creates is played through a bare `surface.play()` whose
+ * promise it never handles. So two instances overlapping on the same element
+ * is doubly destructive: the second one's start() rips the first one's video
+ * out of the document while its play() is still pending — an AbortError we
+ * have no promise to catch — and the first one's eventual teardown then clears
+ * the container again, leaving the second with a dead black preview.
+ *
+ * React remounts this component routinely: StrictMode invokes the effect,
+ * cleans up, and invokes it again on every dev mount, and Fast Refresh repeats
+ * that on each edit. This lock serializes camera setup and teardown across
+ * those remounts so a new instance never starts until the previous one has
+ * fully stopped. ELEMENT_ID is a page singleton, so module scope is the right
+ * scope for the lock. Tasks are chained through a catch so one failed teardown
+ * can't wedge the queue or surface as its own unhandled rejection.
  */
-function isBenignPlayInterruptedRejection(reason: unknown): boolean {
-  const message = reason instanceof Error ? reason.message : String(reason);
-  return message.includes("The play() request was interrupted");
+let cameraLock: Promise<void> = Promise.resolve();
+
+function enqueueCameraTask(task: () => Promise<void>): void {
+  cameraLock = cameraLock.then(task).catch(() => {});
 }
 
 export function CheckinScanner({
@@ -27,82 +36,67 @@ export function CheckinScanner({
   paused: boolean;
 }) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const onScanRef = useRef(onScan);
   const [error, setError] = useState<string | null>(null);
 
+  // The scanner starts once and holds whatever callback it was given forever,
+  // so it has to read through a ref — a captured closure would keep checking
+  // people into whichever event was selected when the camera first came up.
   useEffect(() => {
-    function handleRejection(event: PromiseRejectionEvent) {
-      if (isBenignPlayInterruptedRejection(event.reason)) {
-        event.preventDefault();
-      }
-    }
-    window.addEventListener("unhandledrejection", handleRejection);
-    return () => window.removeEventListener("unhandledrejection", handleRejection);
-  }, []);
+    onScanRef.current = onScan;
+  }, [onScan]);
 
   useEffect(() => {
+    let cancelled = false;
     const scanner = new Html5Qrcode(ELEMENT_ID);
-    scannerRef.current = scanner;
-    let unmounted = false;
 
-    function safeStop() {
-      // stop() throws synchronously (not a rejected promise) if the scanner
-      // never reached a running/paused state, e.g. cleanup fires before the
-      // camera permission prompt resolves — swallow that case entirely.
+    enqueueCameraTask(async () => {
+      // Unmounted while queued behind an earlier teardown — never open the
+      // camera at all. This is the common path under StrictMode.
+      if (cancelled) return;
       try {
-        scanner
-          .stop()
-          .catch(() => {})
-          .finally(() => {
-            try {
-              scanner.clear();
-            } catch {
-              // ignore
-            }
-          });
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: 250 },
+          (decodedText) => onScanRef.current(decodedText),
+          undefined
+        );
+        // Published only on success, so teardown can tell "running" apart
+        // from "never started" without inspecting scanner state.
+        scannerRef.current = scanner;
       } catch {
-        try {
-          scanner.clear();
-        } catch {
-          // ignore
+        if (!cancelled) {
+          setError("Couldn't access the camera. Check permissions and try again.");
         }
       }
-    }
-
-    scanner
-      .start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        (decodedText) => onScan(decodedText),
-        undefined
-      )
-      .then(() => {
-        // Unmounted (or switched tabs) while start() was still in flight —
-        // the camera only just turned on, so stop it now instead of leaving
-        // an orphaned stream running.
-        if (unmounted) safeStop();
-      })
-      .catch(() => {
-        if (!unmounted) setError("Couldn't access the camera. Check permissions and try again.");
-      });
+    });
 
     return () => {
-      unmounted = true;
-      const state = scanner.getState();
-      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-        safeStop();
-      }
+      cancelled = true;
+      enqueueCameraTask(async () => {
+        if (scannerRef.current !== scanner) return;
+        scannerRef.current = null;
+        const state = scanner.getState();
+        if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+          await scanner.stop();
+        }
+        scanner.clear();
+      });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const scanner = scannerRef.current;
     if (!scanner) return;
-    const state = scanner.getState();
-    if (paused && state === Html5QrcodeScannerState.SCANNING) {
-      scanner.pause(true);
-    } else if (!paused && state === Html5QrcodeScannerState.PAUSED) {
-      scanner.resume();
+    try {
+      const state = scanner.getState();
+      if (paused && state === Html5QrcodeScannerState.SCANNING) {
+        scanner.pause(true);
+      } else if (!paused && state === Html5QrcodeScannerState.PAUSED) {
+        scanner.resume();
+      }
+    } catch {
+      // Raced with teardown; the scanner is going away regardless.
     }
   }, [paused]);
 
