@@ -14,8 +14,23 @@
   --color-sage-dark: #4f6b44;
   --color-sage-tint: #e4ebdd;
 
+  /* LoveGate homepage — the page presents itself as a printed admission
+     ticket lying on a dark board, so it needs a surface tone distinct from
+     the paper-white `cream` used elsewhere: `stock` is tanner and reads as
+     card, `board` is the ground the ticket sits on, and the perforation
+     punch-outs are cut through the stock to it. Scoped to the homepage;
+     the event pages, check-in tool and admin keep the palette above. */
+  --color-board: #17110e;
+  --color-stock: #f0e4d0;
+  --color-stock-deep: #e3d2b6;
+  --color-ink: #1b1512;
+  --color-char: #0d0705;
+
   --font-sans: var(--font-work-sans);
   --font-display: var(--font-sora);
+  --font-poster: var(--font-big-shoulders);
+  --font-stub: var(--font-plex-mono);
+  --font-grotesk: var(--font-schibsted);
 }
 
 body {
@@ -57,5 +72,40 @@ body {
   100% {
     transform: translateY(0) translateX(0) scale(1);
     opacity: 0.85;
+  }
+}
+
+/* LoveGate homepage ------------------------------------------------------ */
+
+/* A slow sheen travelling across the poster panel, the way light moves over
+   the foil on a printed ticket. Deliberately the page's only ambient motion. */
+@keyframes foil-sweep {
+  0% {
+    transform: translateX(-130%) skewX(-14deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(240%) skewX(-14deg);
+    opacity: 0;
+  }
+}
+
+/* Load reveal for the hero. Applied via `motion-safe:` only, and the base
+   state is fully visible, so reduced-motion users get the content instantly
+   rather than being left with an element stuck at opacity 0. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
