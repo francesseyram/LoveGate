@@ -3,7 +3,9 @@ import * as logger from "firebase-functions/logger";
 import { Timestamp } from "firebase-admin/firestore";
 import { db } from "./admin";
 import { RESEND_API_KEY } from "./secrets";
-import { normalizePhone } from "./phone";
+import { normalizePhone, toPhoneKey } from "./phone";
+import { isEventCurrent } from "./eventWindow";
+import { buildSearchPrefixes, buildTicketRef, registrationDocId } from "./search";
 import { makeQrValue, generateQrPngBuffer, generateQrDataUrl } from "./qr";
 import { sendConfirmationEmail } from "./email";
 import { EventDoc, RegistrationDoc, registrationToDTO } from "./types";
@@ -39,8 +41,10 @@ export const registerForEvent = onCall<RegisterInput>(
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       throw new HttpsError("invalid-argument", "a valid email is required");
     }
+    // Keep this threshold in sync with the client-side check in
+    // frontend/components/RegistrationForm.tsx.
     const normalizedPhone = normalizePhone(phone ?? "");
-    if (normalizedPhone.length < 7) {
+    if (normalizedPhone.length < 9) {
       throw new HttpsError("invalid-argument", "a valid phone number is required");
     }
     if (!trimmedDob) {
@@ -52,7 +56,8 @@ export const registerForEvent = onCall<RegisterInput>(
     if (!trimmedLevel) {
       throw new HttpsError("invalid-argument", "level is required");
     }
-    const normalizedWhatsapp = whatsapp?.trim() ? normalizePhone(whatsapp) : normalizedPhone;
+    const phoneKey = toPhoneKey(phone ?? "");
+    const normalizedWhatsapp = whatsapp?.trim() ? toPhoneKey(whatsapp) : phoneKey;
 
     const eventSnap = await db.collection("events").doc(eventId).get();
     if (!eventSnap.exists) {
@@ -62,32 +67,23 @@ export const registerForEvent = onCall<RegisterInput>(
     if (event.status !== "published") {
       throw new HttpsError("failed-precondition", "This event is not open for registration");
     }
-
-    const existingSnap = await db
-      .collection("registrations")
-      .where("eventId", "==", eventId)
-      .where("phone", "==", normalizedPhone)
-      .limit(1)
-      .get();
-
-    if (!existingSnap.empty) {
-      const existingDoc = existingSnap.docs[0];
-      const existing = existingDoc.data() as RegistrationDoc;
-      const qrImage = await generateQrDataUrl(existing.qrValue);
-      return {
-        alreadyRegistered: true,
-        registration: registrationToDTO(existingDoc.id, existing),
-        qrImage,
-      };
+    // Without this, a stale shared link keeps issuing tickets to an event that
+    // already happened.
+    if (!isEventCurrent(event.startsAt)) {
+      throw new HttpsError("failed-precondition", "Registration for this event has closed");
     }
 
-    const docRef = db.collection("registrations").doc();
-    const qrValue = makeQrValue(eventId, docRef.id);
+    // Deterministic id keyed on the phone, so a duplicate submit collides in
+    // the database instead of racing a read-then-write check.
+    const docRef = db.collection("registrations").doc(registrationDocId(eventId, phoneKey));
+    const qrValue = makeQrValue(docRef.id);
     const registration: RegistrationDoc = {
       eventId,
       name: trimmedName,
       nameLower: trimmedName.toLowerCase(),
+      searchPrefixes: buildSearchPrefixes(trimmedName, buildTicketRef(docRef.id)),
       phone: normalizedPhone,
+      phoneKey,
       email: trimmedEmail,
       dob: trimmedDob,
       school: trimmedSchool,
@@ -97,9 +93,24 @@ export const registerForEvent = onCall<RegisterInput>(
       status: "going",
       registeredAt: Timestamp.now(),
       checkedInAt: null,
+      checkedInBy: null,
     };
 
-    await docRef.set(registration);
+    try {
+      await docRef.create(registration);
+    } catch (err) {
+      // ALREADY_EXISTS — this phone already has a ticket for this event.
+      if ((err as { code?: number }).code === 6) {
+        const existingDoc = await docRef.get();
+        const existing = existingDoc.data() as RegistrationDoc;
+        return {
+          alreadyRegistered: true,
+          registration: registrationToDTO(existingDoc.id, existing),
+          qrImage: await generateQrDataUrl(existing.qrValue),
+        };
+      }
+      throw err;
+    }
 
     const qrPng = await generateQrPngBuffer(qrValue);
     const qrImage = await generateQrDataUrl(qrValue);

@@ -123,7 +123,14 @@ export default function ReviveEventPage() {
             </div>
             {event.location && (
               <div className="flex items-center gap-3.5">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="shrink-0"
+                  aria-hidden="true"
+                >
                   <path
                     d="M12 21C12 21 19 14.5 19 9.5C19 5.36 15.64 2 12 2C8.36 2 5 5.36 5 9.5C5 14.5 12 21 12 21Z"
                     stroke="#D9A441"
@@ -131,7 +138,21 @@ export default function ReviveEventPage() {
                   />
                   <circle cx="12" cy="9.5" r="2.4" stroke="#D9A441" strokeWidth="1.6" />
                 </svg>
-                <div className="text-lg text-[#FBF3E7]">{event.location}</div>
+                {event.locationUrl ? (
+                  <a
+                    href={event.locationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group text-lg text-[#FBF3E7] underline decoration-gold/40 underline-offset-4 transition hover:decoration-gold"
+                  >
+                    {event.location}
+                    <span className="ml-2 text-sm whitespace-nowrap text-gold">
+                      View map ↗
+                    </span>
+                  </a>
+                ) : (
+                  <div className="text-lg text-[#FBF3E7]">{event.location}</div>
+                )}
               </div>
             )}
           </div>
@@ -142,6 +163,7 @@ export default function ReviveEventPage() {
               eventName={event.name}
               eventStartsAt={event.startsAt}
               eventLocation={event.location}
+              eventLocationUrl={event.locationUrl}
               theme="revive"
             />
           </div>

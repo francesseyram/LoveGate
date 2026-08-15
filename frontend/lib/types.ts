@@ -9,6 +9,8 @@ export interface EventSummary {
   coverPhotoUrl: string;
   startsAt: string;
   location?: string;
+  /** Map link for the venue, shown wherever the location is. */
+  locationUrl?: string;
   status: EventStatus;
 }
 
@@ -34,7 +36,21 @@ export interface RegisterForEventResult {
   qrImage: string;
 }
 
+/**
+ * What staff tooling receives. Intentionally narrower than `Registration` —
+ * the check-in desk never sees DOB, phone, school or the QR payload.
+ */
+export interface RegistrationSummary {
+  id: string;
+  eventId: string;
+  name: string;
+  email: string;
+  ticketRef: string;
+  status: RegistrationStatus;
+  checkedInAt: string | null;
+}
+
 export interface CheckInResult {
   outcome: "checked_in" | "already_checked_in";
-  registration: Registration;
+  registration: RegistrationSummary;
 }

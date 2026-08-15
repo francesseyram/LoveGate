@@ -1,6 +1,12 @@
 import { httpsCallable, FunctionsError } from "firebase/functions";
 import { functions } from "./firebaseClient";
-import type { EventSummary, Registration, RegisterForEventResult, CheckInResult } from "./types";
+import type {
+  EventSummary,
+  RegistrationSummary,
+  RegisterForEventResult,
+  CheckInResult,
+} from "./types";
+import type { RosterEntry } from "./offlineStore";
 
 export function getCallableErrorMessage(err: unknown): string {
   if (err instanceof FunctionsError) {
@@ -39,8 +45,8 @@ export async function registerForEvent(input: {
 export async function searchRegistrations(input: {
   eventId: string;
   query: string;
-}): Promise<Registration[]> {
-  const call = httpsCallable<typeof input, { registrations: Registration[] }>(
+}): Promise<RegistrationSummary[]> {
+  const call = httpsCallable<typeof input, { registrations: RegistrationSummary[] }>(
     functions,
     "searchRegistrations"
   );
@@ -66,8 +72,62 @@ export async function checkInByRegistrationId(input: {
   return data;
 }
 
-export async function triggerManualReminder(input: { eventId: string }): Promise<{ sent: number }> {
-  const call = httpsCallable<typeof input, { sent: number }>(functions, "triggerManualReminder");
+export async function getEventRoster(input: {
+  eventId: string;
+}): Promise<{ roster: RosterEntry[]; fetchedAt: string }> {
+  const call = httpsCallable<typeof input, { roster: RosterEntry[]; fetchedAt: string }>(
+    functions,
+    "getEventRoster"
+  );
+  const { data } = await call(input);
+  return data;
+}
+
+export async function getEventStats(input: {
+  eventId: string;
+}): Promise<{ registered: number; checkedIn: number; yetToArrive: number }> {
+  const call = httpsCallable<
+    typeof input,
+    { registered: number; checkedIn: number; yetToArrive: number }
+  >(functions, "getEventStats");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function syncCheckIns(input: {
+  eventId: string;
+  checkIns: Array<{ registrationId: string; checkedInAt: string }>;
+}): Promise<{ applied: string[]; alreadyCheckedIn: string[]; notFound: string[] }> {
+  const call = httpsCallable<
+    typeof input,
+    { applied: string[]; alreadyCheckedIn: string[]; notFound: string[] }
+  >(functions, "syncCheckIns");
+  const { data } = await call(input);
+  return data;
+}
+
+export interface ReminderResult {
+  sent: number;
+  skipped: number;
+  failed: number;
+}
+
+export async function getReminderRecipientCount(input: {
+  eventId: string;
+}): Promise<{ total: number; alreadyReminded: number; willReceive: number }> {
+  const call = httpsCallable<
+    typeof input,
+    { total: number; alreadyReminded: number; willReceive: number }
+  >(functions, "getReminderRecipientCount");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function triggerManualReminder(input: {
+  eventId: string;
+  resend?: boolean;
+}): Promise<ReminderResult> {
+  const call = httpsCallable<typeof input, ReminderResult>(functions, "triggerManualReminder");
   const { data } = await call(input);
   return data;
 }

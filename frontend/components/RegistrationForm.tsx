@@ -23,12 +23,14 @@ export function RegistrationForm({
   eventName,
   eventStartsAt,
   eventLocation,
+  eventLocationUrl,
   theme = "neutral",
 }: {
   eventId: string;
   eventName: string;
   eventStartsAt?: string;
   eventLocation?: string;
+  eventLocationUrl?: string;
   theme?: "neutral" | "revive";
 }) {
   const [name, setName] = useState("");
@@ -47,13 +49,16 @@ export function RegistrationForm({
     setBannerError(null);
 
     const trimmedName = name.trim();
-    const strippedPhone = phone.replace(/\s/g, "");
+    // Count digits only, matching the server's check in
+    // backend/functions/src/registration.ts — counting punctuation here let
+    // through numbers the server then rejected.
+    const phoneDigits = phone.replace(/\D/g, "");
     if (
       !trimmedName ||
       !dob ||
       !email.includes("@") ||
       !school.trim() ||
-      strippedPhone.length < 9 ||
+      phoneDigits.length < 9 ||
       !level
     ) {
       setBannerError("Please fill in all required fields to continue.");
@@ -131,6 +136,7 @@ export function RegistrationForm({
             eventName={eventName}
             eventStartsAt={eventStartsAt}
             eventLocation={eventLocation}
+            eventLocationUrl={eventLocationUrl}
           />
           <button
             type="button"

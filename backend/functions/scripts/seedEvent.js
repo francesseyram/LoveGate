@@ -22,10 +22,11 @@ async function main() {
     name: "Revive",
     slug,
     description:
-      "Revive is a night of worship and prayer, open to the whole campus community. Come ready to encounter God and leave carrying a fire that doesn't go out.",
+      "Revive is an open invitation to everyone in Accra — a night to encounter the presence of God and the fire of God. Come as you are, and leave carrying a fire that doesn't go out.",
     coverPhotoUrl: "/events/revive/cover.jpg",
     startsAt: admin.firestore.Timestamp.fromDate(startsAt),
-    location: "Anglican Church, University of Ghana",
+    location: "Anglican Church Hall, University of Ghana",
+    locationUrl: "https://maps.app.goo.gl/ak1oJNFkHanHXY9F9",
     status: "published",
   });
 

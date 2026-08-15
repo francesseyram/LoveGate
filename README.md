@@ -15,6 +15,25 @@ The frontend never talks to Firestore directly. Every read/write (registration, 
 lookups, reminders) goes through a Firebase Cloud Function. The only direct Firebase client usage
 is Firebase Auth, for staff sign-in on `/checkin` and `/admin/reminders`.
 
+Functions run in **europe-west1**, not the `us-central1` default — the audience is in Accra and
+West African traffic reaches Europe far more directly than Iowa. `NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION`
+must match, both locally and in Vercel.
+
+## Check-in works offline
+
+The door is the one place a dropped connection is unacceptable, so `/checkin` downloads the whole
+attendee list for the selected event into IndexedDB when it opens. After that:
+
+- QR scans are matched against the local roster — no round trip per person
+- Name / ticket-code search runs locally
+- Check-ins are recorded instantly and queued
+- The queue flushes automatically the moment connectivity returns
+
+The header shows live Online/Offline status and a queued count. `syncCheckIns` is idempotent, so a
+retried queue can't double-count or overwrite someone's original arrival time.
+
+**Open the check-in page once while online before the doors open** — that's what caches the roster.
+
 ## Firebase project
 
 Project ID: `loveinc-ticketting`. Firestore and Authentication (Email/Password provider) are
@@ -44,11 +63,29 @@ cd backend
 npx firebase-tools functions:secrets:set RESEND_API_KEY
 ```
 
-You'll also need a verified sending domain in Resend, and to set `RESEND_FROM_EMAIL` (e.g.
-`Love Inc <tickets@yourdomain.org>`) as a Cloud Functions environment variable if you don't want
-the `tickets@loveinc.org` default in `backend/functions/src/email.ts`.
+### ⚠️ 4. Verify a sending domain before any real event
 
-### 4. Create a staff account
+**Email is currently in test mode and will not reach attendees.**
+
+`RESEND_FROM_EMAIL` in `backend/functions/.env` is set to Resend's shared sandbox sender
+(`onboarding@resend.dev`). That address needs no DNS setup but **only delivers to the Resend
+account owner's own address** — every other recipient is rejected with a 403.
+
+To go live:
+
+1. Add and verify a domain at <https://resend.com/domains>.
+2. Change `RESEND_FROM_EMAIL` in `backend/functions/.env` to an address on that domain, e.g.
+   `Love Inc <tickets@yourdomain.org>`.
+3. Redeploy: `cd backend && npx firebase-tools deploy --only functions`.
+
+Send failures are logged but deliberately do **not** fail the registration — an attendee still
+gets their on-screen ticket if email is down. So check the logs rather than assuming success:
+
+```bash
+cd backend && npx firebase-tools functions:log --only registerForEvent
+```
+
+### 5. Create a staff account
 
 There's no sign-up flow — staff accounts are created directly. Any signed-in Firebase Auth user
 counts as staff (every staff-only Cloud Function just checks `context.auth`); there's no separate
@@ -86,6 +123,9 @@ cd frontend && npm run dev          # http://localhost:3000
 
 # backend, if you want to iterate against the Firebase emulators instead of prod
 cd backend/functions && npm run serve
+
+# backend unit tests (phone normalization, search tokenization, doc-id derivation)
+cd backend/functions && npm test
 ```
 
 Local frontend dev talks to the **deployed** Cloud Functions by default (via `.env.local`), not the

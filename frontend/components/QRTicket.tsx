@@ -49,6 +49,7 @@ export function QRTicket({
   eventName,
   eventStartsAt,
   eventLocation,
+  eventLocationUrl,
 }: {
   theme?: "neutral" | "revive";
   registration: Registration;
@@ -56,6 +57,7 @@ export function QRTicket({
   eventName: string;
   eventStartsAt?: string;
   eventLocation?: string;
+  eventLocationUrl?: string;
 }) {
   const ticketRef = `LG-${registration.id.slice(-6).toUpperCase()}`;
   const eventDate = formatEventDate(eventStartsAt);
@@ -95,7 +97,19 @@ export function QRTicket({
           {eventLocation && (
             <div className="flex items-center gap-2.5">
               <PinIcon />
-              <span>{eventLocation}</span>
+              {eventLocationUrl ? (
+                <a
+                  href={eventLocationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-charcoal/25 underline-offset-2 transition hover:text-charcoal hover:decoration-charcoal/60"
+                >
+                  {eventLocation}
+                  <span className="ml-1.5 whitespace-nowrap text-[#B0801F]">Map ↗</span>
+                </a>
+              ) : (
+                <span>{eventLocation}</span>
+              )}
             </div>
           )}
         </div>
