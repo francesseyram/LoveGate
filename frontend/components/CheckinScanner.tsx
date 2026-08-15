@@ -76,11 +76,20 @@ export function CheckinScanner({
       enqueueCameraTask(async () => {
         if (scannerRef.current !== scanner) return;
         scannerRef.current = null;
-        const state = scanner.getState();
-        if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-          await scanner.stop();
+        try {
+          const state = scanner.getState();
+          if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+            await scanner.stop();
+          }
+        } catch {
+          // stop() can reject if the stream already died; still clear below.
+        } finally {
+          try {
+            scanner.clear();
+          } catch {
+            // ignore
+          }
         }
-        scanner.clear();
       });
     };
   }, []);
