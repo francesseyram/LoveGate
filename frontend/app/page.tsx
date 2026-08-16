@@ -1,58 +1,38 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Big_Shoulders, Schibsted_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import Image from "next/image";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { getPublishedEvents, getCallableErrorMessage } from "@/lib/functions";
 import type { EventSummary } from "@/lib/types";
-import { eventHomeCards } from "@/events/registry";
 
 /**
  * LoveGate homepage.
  *
- * The concept is that the page *is* the ticket. This system's whole vocabulary
- * is already threshold language — gate, admit one, check-in, stub — so instead
- * of a generic landing page the homepage presents itself as a printed
- * admission ticket lying on a dark board: a poster panel for the next
- * gathering, a perforated tear line, and a stub carrying the practical details
- * and the way in. Typefaces are the system's own (condensed signage + mono
- * stub data) rather than any single event's, which keeps the frame neutral
- * enough for a hand-built event page to still feel like its own brand.
+ * The featured event's own flyer carries the page: it runs full-bleed as a
+ * darkened, blurred backdrop with the crisp artwork sitting on top, so the
+ * hero fills the viewport instead of floating as a narrow column. Everything
+ * below returns to a light, wide container. A visitor arrives from a shared
+ * link and needs the what, when, where and the way in, in that order.
  */
 
-// next/font has no metric overrides published for Big Shoulders, so it can't
-// synthesise a matched fallback — an explicit condensed stack keeps the swap
-// from reflowing the hero.
-const poster = Big_Shoulders({
-  variable: "--font-big-shoulders",
-  weight: ["500", "700", "800", "900"],
-  subsets: ["latin"],
-  fallback: ["Haettenschweiler", "Impact", "Arial Narrow", "sans-serif"],
-});
-const grotesk = Schibsted_Grotesk({
-  variable: "--font-schibsted",
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-});
-const stubMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  weight: ["400", "500", "600"],
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta",
+  weight: ["400", "500", "600", "700", "800"],
   subsets: ["latin"],
 });
 
 /**
  * The data model has no `endsAt`, so "still on" is an assumption: an event
- * stays current for six hours past its start, then drops off the page. That
- * keeps a finished gathering from advertising itself as open indefinitely.
+ * stays listed for six hours past its start, then drops off. That keeps a
+ * finished gathering from advertising itself as open indefinitely.
  */
 const ASSUMED_RUN_TIME_MS = 6 * 60 * 60 * 1000;
 
-/**
- * A finished gathering shouldn't keep advertising itself as open, so the list
- * is trimmed to what a visitor can still turn up to, soonest first. Evaluated
- * once as the data lands rather than during render — the cutoff reads the
- * clock, and render has to stay pure.
- */
+const ACCRA = "Africa/Accra";
+
+/** Soonest first, with anything already over removed. */
 function toUpcoming(list: EventSummary[]): EventSummary[] {
   const cutoff = Date.now() - ASSUMED_RUN_TIME_MS;
   return list
@@ -60,91 +40,42 @@ function toUpcoming(list: EventSummary[]): EventSummary[] {
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }
 
-const ACCRA = "Africa/Accra";
-
-function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: ACCRA,
-  });
+function fmt(iso: string, options: Intl.DateTimeFormatOptions): string {
+  return new Date(iso).toLocaleString("en-GB", { timeZone: ACCRA, ...options });
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-GB", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: ACCRA,
-  });
+const timeOf = (iso: string) => fmt(iso, { hour: "numeric", minute: "2-digit" });
+const weekdayOf = (iso: string) => fmt(iso, { weekday: "short" });
+const dayOf = (iso: string) => fmt(iso, { day: "numeric" });
+const monthOf = (iso: string) => fmt(iso, { month: "short" });
+const fullDateOf = (iso: string) =>
+  fmt(iso, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+/** Calendar day in Accra, so events group by the local date people experience. */
+function dayKey(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: ACCRA });
 }
 
-function formatFullDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: ACCRA,
-  });
-}
-
-function stubRef(slug: string): string {
-  return `LG-${slug.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 8)}`;
-}
-
-/* -------------------------------------------------------------------------
-   Ticket furniture
-   ---------------------------------------------------------------------- */
-
-/**
- * The page's one structural divider: a tear line whose punch-outs are cut
- * clean through the stock to the board behind it. Horizontal by default,
- * vertical from `lg` when the hero splits into poster + stub.
- */
-function Perforation({ orientation = "horizontal" }: { orientation?: "horizontal" | "vertical" }) {
-  if (orientation === "vertical") {
-    return (
-      <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 hidden lg:block">
-        <div className="h-full border-l-2 border-dashed border-ink/25" />
-        {/* Smaller than the edge notches: these land where the vertical tear
-            crosses the horizontal ones, so they read as punches at the
-            intersections rather than bites out of the card. */}
-        <span className="absolute -top-2.5 -left-2.5 h-5 w-5 rounded-full bg-board" />
-        <span className="absolute -bottom-2.5 -left-2.5 h-5 w-5 rounded-full bg-board" />
-      </div>
-    );
+function groupByDay(events: EventSummary[]): Array<{ key: string; events: EventSummary[] }> {
+  const groups: Array<{ key: string; events: EventSummary[] }> = [];
+  for (const event of events) {
+    const key = dayKey(event.startsAt);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.events.push(event);
+    else groups.push({ key, events: [event] });
   }
-  return (
-    <div aria-hidden className="pointer-events-none relative">
-      <div className="border-t-2 border-dashed border-ink/25" />
-      <span className="absolute -top-3.5 -left-3.5 h-7 w-7 rounded-full bg-board" />
-      <span className="absolute -top-3.5 -right-3.5 h-7 w-7 rounded-full bg-board" />
-    </div>
-  );
-}
-
-function Eyebrow({ children, tone = "ink" }: { children: React.ReactNode; tone?: "ink" | "gold" }) {
-  return (
-    <p
-      className={`font-stub text-[10px] font-medium tracking-[0.22em] uppercase ${
-        tone === "gold" ? "text-gold" : "text-ink/65"
-      }`}
-    >
-      {children}
-    </p>
-  );
+  return groups;
 }
 
 /* -------------------------------------------------------------------------
-   Countdown
+   Clock
    ---------------------------------------------------------------------- */
 
 /**
- * The wall clock is an external store, not React state — subscribing to it is
- * what keeps render pure and avoids a setState cascade every second. The
- * snapshot has to be cached rather than read live, since `useSyncExternalStore`
- * compares successive reads and `Date.now()` never equals itself.
+ * The wall clock is an external store rather than React state, which keeps
+ * render pure and avoids a setState cascade every tick. The snapshot is
+ * cached because `useSyncExternalStore` compares successive reads and
+ * `Date.now()` never equals itself.
  */
 let clockSnapshot = 0;
 
@@ -153,232 +84,422 @@ function subscribeToClock(onTick: () => void): () => void {
   const id = setInterval(() => {
     clockSnapshot = Date.now();
     onTick();
-  }, 1000);
+  }, 30_000);
   return () => clearInterval(id);
 }
 
-function readClock(): number {
-  return clockSnapshot;
-}
-
-/** 0 on the server and on the very first client read, which renders as a hold. */
-function serverClock(): number {
-  return 0;
-}
+const readClock = () => clockSnapshot;
+const serverClock = () => 0;
 
 function useNow(): number {
   return useSyncExternalStore(subscribeToClock, readClock, serverClock);
 }
 
+function countdownLabel(startsAt: string, now: number): string | null {
+  if (now === 0) return null;
+  const diff = new Date(startsAt).getTime() - now;
+  const minutes = Math.floor(diff / 60_000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (diff <= 0) return "Happening now";
+  if (days >= 1) return `In ${days} ${days === 1 ? "day" : "days"}`;
+  if (hours >= 1) return `In ${hours} ${hours === 1 ? "hour" : "hours"}`;
+  return `In ${Math.max(minutes, 1)} min`;
+}
+
+/* -------------------------------------------------------------------------
+   Cover art
+   ---------------------------------------------------------------------- */
+
 /**
- * Time left is the single most actionable fact on the page, so it gets the
- * display face at size. Units step down as the event closes in — days/hours/
- * minutes while it's far off, hours/minutes/seconds on the day itself — so
- * the ticking digit only appears when it actually means something.
+ * Real flyer art when the event has it. Events without artwork fall back to a
+ * warm gradient picked deterministically from the slug, so a given event
+ * always wears the same colours everywhere it appears rather than looking
+ * broken.
  */
-function Countdown({ startsAt }: { startsAt: string }) {
-  const now = useNow();
-  const target = useMemo(() => new Date(startsAt).getTime(), [startsAt]);
+const COVER_THEMES = [
+  "linear-gradient(150deg,#7A1F24 0%,#B23A48 48%,#2A0D10 100%)",
+  "linear-gradient(150deg,#8F5A12 0%,#D9A441 52%,#3A2408 100%)",
+  "linear-gradient(150deg,#43213F 0%,#8F2E5C 50%,#1B0C1A 100%)",
+  "linear-gradient(150deg,#123F3A 0%,#2E7D6B 50%,#08211E 100%)",
+];
 
-  if (now === 0) {
-    return <div className="h-[86px]" aria-hidden />;
-  }
+function themeFor(slug: string): string {
+  let hash = 0;
+  for (let i = 0; i < slug.length; i++) hash = (hash * 31 + slug.charCodeAt(i)) >>> 0;
+  return COVER_THEMES[hash % COVER_THEMES.length];
+}
 
-  const diff = target - now;
-
-  if (diff <= 0) {
-    return (
-      <div>
-        <Eyebrow tone="gold">Happening now</Eyebrow>
-        <p className="mt-2 font-poster text-[44px] leading-none font-extrabold tracking-tight text-coral uppercase">
-          Doors are open
-        </p>
-      </div>
-    );
-  }
-
-  const totalSeconds = Math.floor(diff / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  const units =
-    days > 0
-      ? [
-          { value: days, label: days === 1 ? "day" : "days" },
-          { value: hours, label: "hrs" },
-          { value: minutes, label: "min" },
-        ]
-      : [
-          { value: hours, label: "hrs" },
-          { value: minutes, label: "min" },
-          { value: seconds, label: "sec" },
-        ];
+function CoverArt({
+  event,
+  variant,
+  onResolved,
+}: {
+  event: EventSummary;
+  variant: "hero" | "thumb";
+  onResolved?: (src: string | null) => void;
+}) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(event.coverPhotoUrl) && !failed;
+  const isHero = variant === "hero";
 
   return (
-    <div>
-      <Eyebrow>Starts in</Eyebrow>
-      {/* The digits retick every second, which would make a screen reader
-          announce the block endlessly — the static date below carries the
-          same information once. */}
-      <div aria-hidden className="mt-2 flex items-end gap-5">
-        {units.map((unit) => (
-          <div key={unit.label}>
-            <div className="font-poster text-[54px] leading-[0.82] font-extrabold tracking-tight tabular-nums text-ink">
-              {String(unit.value).padStart(2, "0")}
+    <div
+      className="relative h-full w-full overflow-hidden"
+      style={{ backgroundImage: themeFor(event.slug) }}
+    >
+      {showImage ? (
+        <Image
+          src={event.coverPhotoUrl}
+          alt={`${event.name} flyer`}
+          fill
+          priority={isHero}
+          sizes={isHero ? "(max-width: 1024px) 90vw, 420px" : "112px"}
+          className="object-cover"
+          onLoad={() => onResolved?.(event.coverPhotoUrl)}
+          onError={() => {
+            setFailed(true);
+            onResolved?.(null);
+          }}
+        />
+      ) : (
+        <>
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-70"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 22% 24%, rgba(255,255,255,0.16) 0, transparent 42%), radial-gradient(circle at 82% 76%, rgba(0,0,0,0.3) 0, transparent 46%)",
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-5 text-center">
+            <span
+              className={
+                isHero
+                  ? "text-[clamp(30px,5vw,52px)] leading-[0.95] font-extrabold tracking-[-0.03em] text-white/95 uppercase"
+                  : "text-3xl font-extrabold text-white/90"
+              }
+            >
+              {isHero ? event.name : event.name.slice(0, 1).toUpperCase()}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------
+   Icons
+   ---------------------------------------------------------------------- */
+
+type IconProps = { className?: string };
+
+function GateMark({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M4 21V11a8 8 0 0 1 16 0v10"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path d="M3 21h18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CalendarIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`h-[18px] w-[18px] shrink-0 ${className}`}>
+      <rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PinIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`h-[18px] w-[18px] shrink-0 ${className}`}>
+      <path
+        d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function TicketIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`h-[18px] w-[18px] shrink-0 ${className}`}>
+      <path
+        d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5a2.5 2.5 0 0 0 0 5V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5a2.5 2.5 0 0 0 0-5V8Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
+/* -------------------------------------------------------------------------
+   Hero — full bleed
+   ---------------------------------------------------------------------- */
+
+function Hero({ event }: { event: EventSummary }) {
+  // Only bleed real artwork; smearing the generated gradient behind itself
+  // would just look like a rendering fault.
+  const [bleed, setBleed] = useState<string | null>(null);
+  const countdown = countdownLabel(event.startsAt, useNow());
+
+  return (
+    <section className="relative isolate overflow-hidden bg-[#120807]">
+      {bleed && (
+        <Image
+          src={bleed}
+          alt=""
+          aria-hidden
+          fill
+          priority
+          sizes="100vw"
+          className="scale-125 object-cover opacity-35 blur-2xl"
+        />
+      )}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-10%,rgba(178,58,72,0.5)_0%,transparent_55%)]"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(18,8,7,0.55)_0%,rgba(18,8,7,0.75)_60%,#120807_100%)]"
+      />
+
+      <div className="relative mx-auto grid max-w-[1240px] items-center gap-10 px-6 py-12 sm:px-8 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16 lg:py-20">
+        <div className="mx-auto w-full max-w-[340px] lg:mx-0 lg:max-w-none">
+          <Link
+            href={`/events/${event.slug}`}
+            tabIndex={-1}
+            aria-hidden
+            className="relative block aspect-[4/5] overflow-hidden rounded-2xl ring-1 ring-white/12 shadow-[0_50px_90px_-35px_rgba(0,0,0,0.95)] transition duration-300 hover:scale-[1.015]"
+          >
+            <CoverArt event={event} variant="hero" onResolved={setBleed} />
+          </Link>
+        </div>
+
+        <div className="flex flex-col items-start">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-coral px-3.5 py-1.5 text-[11.5px] font-bold tracking-[0.08em] text-white uppercase">
+              <TicketIcon className="h-3.5 w-3.5" />
+              Registration open
+            </span>
+            <span className="rounded-full bg-white/10 px-3.5 py-1.5 text-[11.5px] font-bold tracking-[0.08em] text-cream/80 uppercase">
+              Free entry
+            </span>
+            {countdown && (
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-[11.5px] font-bold tracking-[0.08em] text-cream/80 uppercase">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-gold opacity-70 motion-safe:animate-ping" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gold" />
+                </span>
+                {countdown}
+              </span>
+            )}
+          </div>
+
+          <h1 className="mt-5 text-[clamp(42px,6.5vw,78px)] leading-[0.98] font-extrabold tracking-[-0.045em] text-cream">
+            {event.name}
+          </h1>
+
+          {event.description && (
+            <p className="mt-4 line-clamp-3 max-w-[54ch] text-[17px] leading-relaxed text-cream/65">
+              {event.description}
+            </p>
+          )}
+
+          <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:gap-10">
+            <div className="flex items-start gap-3">
+              <CalendarIcon className="mt-0.5 text-gold" />
+              <div>
+                <p className="text-[15.5px] font-semibold text-cream">
+                  {fullDateOf(event.startsAt)}
+                </p>
+                <p className="text-[14px] text-cream/55">{timeOf(event.startsAt)}</p>
+              </div>
             </div>
-            <div className="font-stub mt-1.5 text-[10px] tracking-[0.18em] text-ink/60 uppercase">
-              {unit.label}
+            {event.location && (
+              <div className="flex items-start gap-3">
+                <PinIcon className="mt-0.5 text-gold" />
+                <div>
+                  <p className="text-[15.5px] font-semibold text-cream">{event.location}</p>
+                  {event.locationUrl && (
+                    <a
+                      href={event.locationUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded text-[14px] text-gold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                    >
+                      Open in Maps
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Link
+            href={`/events/${event.slug}`}
+            className="mt-9 inline-flex items-center gap-2.5 rounded-full bg-coral px-8 py-4 text-[17px] font-bold text-white shadow-[0_18px_40px_-14px_rgba(178,58,72,0.9)] transition hover:bg-coral-dark focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold active:translate-y-px"
+          >
+            Get your free ticket
+            <span aria-hidden>→</span>
+          </Link>
+          <p className="mt-3 text-[13.5px] text-cream/45">
+            Takes about a minute · no account needed
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------
+   Date-railed list
+   ---------------------------------------------------------------------- */
+
+function EventRow({ event }: { event: EventSummary }) {
+  return (
+    <Link
+      href={`/events/${event.slug}`}
+      className="group flex items-center gap-4 rounded-2xl border border-line bg-surface p-4 transition hover:-translate-y-0.5 hover:border-ink/15 hover:shadow-[0_16px_36px_-22px_rgba(25,21,18,0.45)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-coral"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-semibold text-ink/50">{timeOf(event.startsAt)}</p>
+        <h3 className="mt-0.5 truncate text-[20px] leading-tight font-bold tracking-[-0.02em] text-ink">
+          {event.name}
+        </h3>
+        {event.location && (
+          <p className="mt-1.5 flex items-center gap-1.5 truncate text-[13.5px] text-ink/55">
+            <PinIcon className="h-4 w-4" />
+            <span className="truncate">{event.location}</span>
+          </p>
+        )}
+      </div>
+      <div className="relative h-[104px] w-[84px] shrink-0 overflow-hidden rounded-xl">
+        <CoverArt event={event} variant="thumb" />
+      </div>
+    </Link>
+  );
+}
+
+function UpcomingList({ events }: { events: EventSummary[] }) {
+  return (
+    <section className="mt-16">
+      <h2 className="text-[26px] font-extrabold tracking-[-0.03em] text-ink">More gatherings</h2>
+      <div className="mt-7 flex flex-col">
+        {groupByDay(events).map((group) => {
+          const first = group.events[0];
+          return (
+            <div
+              key={group.key}
+              className="grid grid-cols-[48px_1fr] gap-4 sm:grid-cols-[64px_1fr] sm:gap-6"
+            >
+              <div className="pt-4 text-center">
+                <p className="text-[11px] font-bold tracking-[0.1em] text-ink/45 uppercase">
+                  {weekdayOf(first.startsAt)}
+                </p>
+                <p className="text-[28px] leading-none font-extrabold tracking-[-0.03em] text-ink">
+                  {dayOf(first.startsAt)}
+                </p>
+                <p className="text-[11px] font-bold tracking-[0.1em] text-ink/45 uppercase">
+                  {monthOf(first.startsAt)}
+                </p>
+              </div>
+              <div className="relative border-l border-line pb-6 pl-6">
+                <span
+                  aria-hidden
+                  className="absolute top-7 -left-[4.5px] h-2 w-2 rounded-full bg-coral ring-4 ring-canvas"
+                />
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {group.events.map((event) => (
+                    <EventRow key={event.id} event={event} />
+                  ))}
+                </div>
+              </div>
             </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------
+   Supporting sections
+   ---------------------------------------------------------------------- */
+
+/**
+ * What a first-timer actually wonders. Every line is true of the system as
+ * built: entry is free, the phone number dedupes to one ticket per person,
+ * and the QR is both shown on screen and attached to the confirmation email.
+ */
+const GOOD_TO_KNOW = [
+  {
+    icon: <TicketIcon className="h-5 w-5" />,
+    title: "Every ticket is free",
+    body: "Nothing to pay, at registration or at the door. Come as you are — first time or fiftieth.",
+  },
+  {
+    icon: <PinIcon className="h-5 w-5" />,
+    title: "One ticket per person",
+    body: "Bringing a friend? Send them the link so they get their own ticket to show at the door.",
+  },
+  {
+    icon: <CalendarIcon className="h-5 w-5" />,
+    title: "Your phone is your ticket",
+    body: "Show the QR code at the entrance. It's emailed to you too, in case your battery doesn't last.",
+  },
+];
+
+function GoodToKnow({ event }: { event?: EventSummary }) {
+  return (
+    <section className="mt-16">
+      <h2 className="text-[26px] font-extrabold tracking-[-0.03em] text-ink">Before you come</h2>
+      <div className="mt-7 grid gap-4 md:grid-cols-3">
+        {GOOD_TO_KNOW.map((item) => (
+          <div key={item.title} className="rounded-2xl border border-line bg-surface p-6">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-coral/10 text-coral-dark">
+              {item.icon}
+            </div>
+            <h3 className="mt-5 text-[17px] font-bold tracking-[-0.01em] text-ink">{item.title}</h3>
+            <p className="mt-2 text-[14.5px] leading-relaxed text-ink/60">{item.body}</p>
           </div>
         ))}
       </div>
-      <p className="sr-only">Starts on {formatFullDate(startsAt)}</p>
-    </div>
-  );
-}
 
-/* -------------------------------------------------------------------------
-   Poster panel
-   ---------------------------------------------------------------------- */
-
-/**
- * The event's own cover art when it has one, otherwise a typographic poster
- * built from the name. `coverPhotoUrl` points at a file the repo may not have
- * yet, so a failed load quietly falls back rather than leaving a broken frame.
- */
-function PosterPanel({ event }: { event: EventSummary }) {
-  const [coverFailed, setCoverFailed] = useState(false);
-  const showCover = Boolean(event.coverPhotoUrl) && !coverFailed;
-
-  return (
-    <div className="relative flex min-h-[420px] flex-col justify-end overflow-hidden bg-char sm:min-h-[520px]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_115%,#7a1f24_0%,#3a0f12_34%,#170807_62%,#0d0705_88%)]" />
-
-      {showCover && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={event.coverPhotoUrl}
-          alt=""
-          onError={() => setCoverFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover opacity-55"
-        />
-      )}
-
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 18% 26%, rgba(230,100,60,0.26) 0, transparent 1.3%), radial-gradient(circle at 79% 16%, rgba(230,100,60,0.22) 0, transparent 1.1%), radial-gradient(circle at 88% 58%, rgba(230,100,60,0.28) 0, transparent 0.9%), radial-gradient(circle at 12% 70%, rgba(230,100,60,0.24) 0, transparent 1.2%)",
-        }}
-      />
-
-      {/* Foil sheen */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-y-0 -left-1/3 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(251,243,231,0.13),transparent)] motion-safe:animate-[foil-sweep_11s_ease-in-out_infinite]" />
-      </div>
-
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_38%,rgba(13,7,5,0.86)_100%)]" />
-
-      <div className="relative z-10 p-7 sm:p-9">
-        <Eyebrow tone="gold">Next gathering</Eyebrow>
-        <h1 className="font-poster mt-3 text-[clamp(58px,12vw,116px)] leading-[0.84] font-extrabold tracking-[-0.015em] text-cream uppercase">
-          {event.name}
-        </h1>
-      </div>
-
-      <div className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-cream/15 px-7 py-3.5 sm:px-9">
-        <span className="font-stub text-[11px] tracking-[0.14em] text-gold uppercase">
-          {formatDay(event.startsAt)} · {formatTime(event.startsAt)}
-        </span>
-        {event.location && (
-          <>
-            <span aria-hidden className="text-cream/25">
-              /
-            </span>
-            <span className="font-stub text-[11px] tracking-[0.14em] text-cream/55 uppercase">
-              {event.location}
-            </span>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------
-   Hero
-   ---------------------------------------------------------------------- */
-
-function NextGathering({ event }: { event: EventSummary }) {
-  return (
-    <section className="grid lg:grid-cols-[1.12fr_0.88fr]">
-      <div className="motion-safe:animate-[rise-in_600ms_ease-out_both]">
-        <PosterPanel event={event} />
-      </div>
-
-      <div className="relative">
-        <Perforation orientation="vertical" />
-        <div className="lg:hidden">
-          <Perforation />
-        </div>
-
-        <div className="flex h-full flex-col justify-between gap-8 px-6 py-8 motion-safe:animate-[rise-in_600ms_ease-out_120ms_both] sm:px-8 sm:py-9">
-          <div className="flex flex-col gap-7">
-            <div className="flex flex-col gap-5">
-              <div>
-                <Eyebrow>When</Eyebrow>
-                <p className="mt-1.5 text-[17px] leading-snug font-medium text-ink">
-                  {formatFullDate(event.startsAt)}
-                </p>
-                <p className="text-[17px] leading-snug text-ink/70">
-                  {formatTime(event.startsAt)}
-                </p>
-              </div>
-
-              {event.location && (
-                <div>
-                  <Eyebrow>Where</Eyebrow>
-                  <p className="mt-1.5 text-[17px] leading-snug font-medium text-ink">
-                    {event.location}
-                  </p>
-                </div>
-              )}
+      {event?.location && (
+        <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-line bg-surface p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink/5 text-ink/70">
+              <PinIcon className="h-5 w-5" />
             </div>
-
-            <div className="border-t border-ink/12 pt-6">
-              <Countdown startsAt={event.startsAt} />
+            <div>
+              <h3 className="text-[17px] font-bold tracking-[-0.01em] text-ink">Getting there</h3>
+              <p className="mt-1 text-[14.5px] text-ink/60">{event.location}</p>
             </div>
           </div>
-
-          <div>
-            <Link
-              href={`/events/${event.slug}`}
-              className="group flex h-14 w-full items-center justify-between gap-3 rounded-xl bg-coral px-6 text-cream transition hover:bg-coral-dark focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold active:translate-y-px"
+          {event.locationUrl && (
+            <a
+              href={event.locationUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 rounded-full border border-line px-5 py-2.5 text-[14px] font-semibold text-ink transition hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
             >
-              <span className="font-poster text-[22px] font-bold tracking-wide uppercase">
-                Get your ticket
-              </span>
-              <span
-                aria-hidden
-                className="text-xl transition-transform group-hover:translate-x-1"
-              >
-                →
-              </span>
-            </Link>
-            <div className="mt-3.5 flex items-center justify-between">
-              <p className="font-stub text-[10px] tracking-[0.16em] text-ink/60 uppercase">
-                Free · one ticket per person
-              </p>
-              <p className="font-stub text-[10px] tracking-[0.16em] text-ink/50 uppercase">
-                {stubRef(event.slug)}
-              </p>
-            </div>
-          </div>
+              Open in Maps
+            </a>
+          )}
         </div>
-      </div>
+      )}
     </section>
   );
 }
@@ -387,150 +508,40 @@ function NextGathering({ event }: { event: EventSummary }) {
    States
    ---------------------------------------------------------------------- */
 
-function TicketMessage({
-  eyebrow,
+function Placeholder({
   title,
   body,
   action,
 }: {
-  eyebrow: string;
   title: string;
   body: string;
   action?: React.ReactNode;
 }) {
   return (
-    <section className="px-6 py-16 text-center sm:px-10 sm:py-24">
-      <Eyebrow tone="gold">{eyebrow}</Eyebrow>
-      <h1 className="font-poster mx-auto mt-4 max-w-[16ch] text-[clamp(38px,8vw,64px)] leading-[0.9] font-extrabold tracking-tight text-ink uppercase">
+    <section className="bg-[#120807] px-6 py-28 text-center">
+      <h1 className="text-[clamp(30px,5vw,44px)] font-extrabold tracking-[-0.035em] text-cream">
         {title}
       </h1>
-      <p className="mx-auto mt-4 max-w-[42ch] text-[17px] leading-relaxed text-ink/70">{body}</p>
-      {action && <div className="mt-7">{action}</div>}
+      <p className="mx-auto mt-4 max-w-[46ch] text-[16.5px] leading-relaxed text-cream/60">{body}</p>
+      {action && <div className="mt-8">{action}</div>}
     </section>
   );
 }
 
-function LoadingTicket() {
+function HeroSkeleton() {
   return (
-    <section aria-busy className="grid lg:grid-cols-[1.12fr_0.88fr]">
-      <div className="min-h-[420px] animate-pulse bg-char/90 sm:min-h-[520px]" />
-      <div className="relative">
-        <Perforation orientation="vertical" />
-        <div className="lg:hidden">
-          <Perforation />
-        </div>
-        <div className="flex flex-col gap-5 px-6 py-9 sm:px-8">
-          <div className="h-3 w-20 animate-pulse rounded-full bg-stock-deep" />
-          <div className="h-6 w-52 animate-pulse rounded-full bg-stock-deep" />
-          <div className="h-6 w-36 animate-pulse rounded-full bg-stock-deep" />
-          <div className="mt-4 h-14 w-full animate-pulse rounded-xl bg-stock-deep" />
+    <section aria-busy className="bg-[#120807]">
+      <div className="mx-auto grid max-w-[1240px] items-center gap-10 px-6 py-12 sm:px-8 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16 lg:py-20">
+        <div className="mx-auto aspect-[4/5] w-full max-w-[340px] animate-pulse rounded-2xl bg-white/6 lg:mx-0 lg:max-w-none" />
+        <div className="flex flex-col gap-5">
+          <div className="h-7 w-52 animate-pulse rounded-full bg-white/6" />
+          <div className="h-16 w-4/5 animate-pulse rounded-2xl bg-white/6" />
+          <div className="h-4 w-full animate-pulse rounded-full bg-white/6" />
+          <div className="h-4 w-2/3 animate-pulse rounded-full bg-white/6" />
+          <div className="mt-4 h-14 w-64 animate-pulse rounded-full bg-white/6" />
         </div>
       </div>
       <p className="sr-only">Loading gatherings</p>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------------------------
-   Secondary sections
-   ---------------------------------------------------------------------- */
-
-/**
- * What a first-timer actually wants to know, which is not how a form works.
- * Every claim here is true of the system as built: entry is free, the phone
- * dedupe means one ticket per person, and the QR is both rendered on screen
- * and attached to the confirmation email.
- */
-const BEFORE_YOU_COME = [
-  {
-    title: "Come as you are",
-    body: "No dress code, no membership, nothing to pay. First time or fiftieth, the door is the same.",
-  },
-  {
-    title: "Bring someone",
-    body: "Tickets are one per person, so send your friend the link and they'll get their own to show at the door.",
-  },
-  {
-    title: "Your phone is your ticket",
-    body: "Show the QR code at the entrance and you're in. It's emailed to you as well, in case your battery doesn't make it.",
-  },
-];
-
-function BeforeYouCome() {
-  return (
-    <section className="px-6 py-12 sm:px-10 sm:py-16">
-      <Eyebrow tone="gold">Before you come</Eyebrow>
-      <div className="mt-8 grid gap-9 sm:grid-cols-3 sm:gap-7">
-        {BEFORE_YOU_COME.map((item) => (
-          <div key={item.title}>
-            <div aria-hidden className="mb-4 h-px w-9 bg-gold" />
-            <h3 className="font-poster text-[26px] leading-none font-bold tracking-tight text-ink uppercase">
-              {item.title}
-            </h3>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-ink/70">{item.body}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/** Compact stub for every gathering after the next one. */
-function MiniStub({ event }: { event: EventSummary }) {
-  return (
-    <Link
-      href={`/events/${event.slug}`}
-      className="group flex items-stretch overflow-hidden rounded-lg border border-ink/12 bg-stock-deep/45 transition hover:-translate-y-0.5 hover:border-ink/25 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold"
-    >
-      <div className="flex w-[86px] shrink-0 flex-col items-center justify-center bg-char px-3 py-5 text-center">
-        <div className="font-poster text-[34px] leading-none font-extrabold text-cream">
-          {new Date(event.startsAt).toLocaleDateString("en-GB", {
-            day: "numeric",
-            timeZone: ACCRA,
-          })}
-        </div>
-        <div className="font-stub mt-1 text-[10px] tracking-[0.16em] text-gold uppercase">
-          {new Date(event.startsAt).toLocaleDateString("en-GB", {
-            month: "short",
-            timeZone: ACCRA,
-          })}
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4">
-        <h3 className="font-poster truncate text-[24px] leading-none font-bold tracking-tight text-ink uppercase">
-          {event.name}
-        </h3>
-        <p className="font-stub mt-1.5 truncate text-[10px] tracking-[0.14em] text-ink/65 uppercase">
-          {formatTime(event.startsAt)}
-          {event.location ? ` · ${event.location}` : ""}
-        </p>
-      </div>
-      <div
-        aria-hidden
-        className="flex items-center pr-4 text-lg text-ink/50 transition-transform group-hover:translate-x-1 group-hover:text-coral"
-      >
-        →
-      </div>
-    </Link>
-  );
-}
-
-function AlsoComingUp({ events }: { events: EventSummary[] }) {
-  return (
-    <section className="px-6 py-12 sm:px-10 sm:py-16">
-      <Eyebrow tone="gold">Also coming up</Eyebrow>
-      <div className="mt-7 grid gap-4 lg:grid-cols-2">
-        {events.map((event) => {
-          // An event can ship a hand-built teaser of its own; the registry is
-          // where a new one opts in.
-          const Custom = eventHomeCards[event.slug];
-          return Custom ? (
-            <Custom key={event.id} event={event} />
-          ) : (
-            <MiniStub key={event.id} event={event} />
-          );
-        })}
-      </div>
     </section>
   );
 }
@@ -559,105 +570,83 @@ export default function HomePage() {
     fetchEvents();
   }
 
-  const [next, ...rest] = events ?? [];
+  const [featured, ...rest] = events ?? [];
 
   return (
     <div
-      className={`${poster.variable} ${grotesk.variable} ${stubMono.variable} min-h-screen bg-board px-3 py-3 font-[family-name:var(--font-schibsted)] sm:px-6 sm:py-8`}
+      className={`${jakarta.variable} min-h-screen bg-canvas font-[family-name:var(--font-plus-jakarta)] text-ink`}
     >
-      <div className="relative mx-auto max-w-[1120px] overflow-hidden rounded-2xl bg-stock text-ink shadow-[0_40px_90px_-40px_rgba(0,0,0,0.9)]">
-        {/* Paper grain — sells the card stock without tinting it. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-20 opacity-[0.05] mix-blend-multiply"
-          style={{
-            backgroundImage:
-              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-          }}
-        />
-
-        <header className="flex items-center justify-between gap-4 px-6 py-4 sm:px-10">
+      <header className="absolute inset-x-0 top-0 z-30">
+        <div className="mx-auto flex max-w-[1240px] items-center justify-between px-6 py-5 sm:px-8">
           <Link
             href="/"
-            className="flex items-baseline gap-2 rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
+            className="flex items-center gap-2.5 rounded-lg text-cream focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
           >
-            <span className="font-poster text-[26px] leading-none font-extrabold tracking-tight text-ink uppercase">
-              Love<span className="text-coral">Gate</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral text-cream">
+              <GateMark className="h-5 w-5" />
             </span>
+            <span className="text-[20px] font-extrabold tracking-[-0.035em]">LoveGate</span>
           </Link>
-          <span className="font-stub text-[10px] tracking-[0.2em] text-ink/60 uppercase">
-            Admit one · free entry
-          </span>
-        </header>
+          <Link
+            href="/login"
+            className="rounded-full px-4 py-2 text-[13.5px] font-semibold text-cream/60 transition hover:bg-white/10 hover:text-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+          >
+            Staff sign-in
+          </Link>
+        </div>
+      </header>
 
-        <Perforation />
-
+      <main>
         {error ? (
-          <TicketMessage
-            eyebrow="Nothing loaded"
+          <Placeholder
             title="Couldn't load gatherings"
-            body="Check your connection, then load the page again."
+            body="Check your connection, then try again."
             action={
               <>
                 <button
                   onClick={retry}
-                  className="font-poster h-12 rounded-xl bg-coral px-7 text-[19px] font-bold tracking-wide text-cream uppercase transition hover:bg-coral-dark focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold"
+                  className="rounded-full bg-coral px-7 py-3.5 text-[15px] font-bold text-white transition hover:bg-coral-dark focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold"
                 >
                   Try again
                 </button>
-                {/* The raw callable message, kept out of the main copy so the
-                    guidance stays readable but the cause is still recoverable. */}
-                <p className="font-stub mt-5 text-[11px] tracking-wide text-ink/50">{error}</p>
+                <p className="mt-4 text-[13px] text-cream/40">{error}</p>
               </>
             }
           />
         ) : !events ? (
-          <LoadingTicket />
-        ) : !next ? (
-          <TicketMessage
-            eyebrow="Between gatherings"
-            title="Nothing open right now"
-            body="When the next gathering is announced, it shows up here first."
+          <HeroSkeleton />
+        ) : !featured ? (
+          <Placeholder
+            title="No gatherings open right now"
+            body="When the next one is announced it shows up here first. Check back soon."
           />
         ) : (
-          <NextGathering event={next} />
+          <Hero event={featured} />
         )}
 
-        <Perforation />
-        <BeforeYouCome />
+        <div className="mx-auto max-w-[1240px] px-6 pb-24 sm:px-8">
+          {rest.length > 0 && <UpcomingList events={rest} />}
+          <GoodToKnow event={featured} />
+        </div>
+      </main>
 
-        {rest.length > 0 && (
-          <>
-            <Perforation />
-            <AlsoComingUp events={rest} />
-          </>
-        )}
-
-        <Perforation />
-
-        <footer className="flex flex-col gap-5 px-6 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-10">
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-[1240px] flex-col gap-4 px-6 py-9 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/assets/love-inc-legon-badge.png"
               alt=""
-              className="h-9 w-9 object-contain opacity-70"
+              className="h-11 w-11 object-contain"
             />
             <div>
-              <p className="text-[13px] font-medium text-ink/70">Love Inc Legon</p>
-              <p className="font-stub text-[10px] tracking-[0.16em] text-ink/60 uppercase">
-                Est. 2025
-              </p>
+              <p className="text-[14.5px] font-bold tracking-[-0.01em] text-ink">Love Inc Legon</p>
+              <p className="text-[13px] text-ink/50">Est. 2025</p>
             </div>
           </div>
-          <Link
-            href="/login"
-            className="font-stub rounded text-[10px] tracking-[0.18em] text-ink/60 uppercase underline-offset-4 transition hover:text-coral hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
-          >
-            Staff sign-in
-          </Link>
-        </footer>
-      </div>
+          <p className="text-[13px] text-ink/45">University of Ghana, Legon</p>
+        </div>
+      </footer>
     </div>
   );
 }
