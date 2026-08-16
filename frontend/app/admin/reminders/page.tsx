@@ -69,15 +69,54 @@ function formatWhen(iso?: string): string {
   });
 }
 
+const ACCRA = "Africa/Accra";
+
+function ymdInAccra(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ACCRA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function isTomorrowInAccra(startsAt: Date): boolean {
+  const [year, month, day] = ymdInAccra(new Date()).split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1));
+  const tomorrowKey = [
+    tomorrow.getUTCFullYear(),
+    String(tomorrow.getUTCMonth() + 1).padStart(2, "0"),
+    String(tomorrow.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+  return ymdInAccra(startsAt) === tomorrowKey;
+}
+
 /** Mirrors what backend/functions/src/email.ts actually builds. */
 function EmailPreview({ event }: { event?: EventSummary }) {
-  const time = event
-    ? new Date(event.startsAt).toLocaleTimeString("en-GB", {
+  const startsAt = event ? new Date(event.startsAt) : null;
+  const tomorrow = startsAt ? isTomorrowInAccra(startsAt) : false;
+  const time = startsAt
+    ? startsAt.toLocaleTimeString("en-GB", {
         hour: "numeric",
         minute: "2-digit",
-        timeZone: "Africa/Accra",
+        timeZone: ACCRA,
       })
     : "";
+  const date = startsAt
+    ? startsAt.toLocaleString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: ACCRA,
+      })
+    : "";
+
+  const subject = event
+    ? tomorrow
+      ? `Tomorrow: ${event.name} at ${time}`
+      : `Reminder: ${event.name} on ${date}`
+    : "Reminder: your event";
 
   const contents = [
     "Their QR ticket and ticket reference",
@@ -95,9 +134,7 @@ function EmailPreview({ event }: { event?: EventSummary }) {
         <p className="font-[family-name:var(--font-oswald)] text-[10px] tracking-[0.14em] text-cream/40 uppercase">
           Subject
         </p>
-        <p className="mt-1.5 text-[15px] font-medium text-cream">
-          {event ? `Tomorrow: ${event.name} at ${time}` : "Tomorrow: your event"}
-        </p>
+        <p className="mt-1.5 text-[15px] font-medium text-cream">{subject}</p>
       </div>
 
       <ul className="mt-4 flex flex-col gap-2.5">

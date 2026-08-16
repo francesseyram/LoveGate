@@ -710,7 +710,7 @@ export default function HomePage() {
         )}
 
         <div className="mx-auto max-w-[1240px] px-5 pb-20 sm:px-8 sm:pb-24">
-          {events && <OtherEvents events={rest} />}
+          {featured && <OtherEvents events={rest} />}
           <GoodToKnow event={featured} />
         </div>
       </main>

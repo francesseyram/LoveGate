@@ -65,10 +65,39 @@ function formatEventDate(startsAt: Date): string {
   return `${formatDatePart(startsAt)} at ${formatTimePart(startsAt)}`;
 }
 
+/** Calendar Y-M-D in Accra, so "tomorrow" is the local day, not the server's. */
+function zonedYmd(date: Date): [number, number, number] {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: EVENT_TIME_ZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(date);
+  const n = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)!.value);
+  return [n("year"), n("month"), n("day")];
+}
+
+function isTomorrow(startsAt: Date, now = new Date()): boolean {
+  const [year, month, day] = zonedYmd(now);
+  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1));
+  const [eventYear, eventMonth, eventDay] = zonedYmd(startsAt);
+  return (
+    eventYear === tomorrow.getUTCFullYear() &&
+    eventMonth === tomorrow.getUTCMonth() + 1 &&
+    eventDay === tomorrow.getUTCDate()
+  );
+}
+
 function venuePlain(event: EventDoc): string {
   if (!event.location) return "";
   const base = ` at ${event.location}`;
   return event.locationUrl ? `${base}\nDirections: ${event.locationUrl}` : base;
+}
+
+/** `null` drops a line; `""` is a blank line. `.filter(Boolean)` would eat both. */
+function plainText(lines: Array<string | null>): string {
+  return lines.filter((line): line is string => line !== null).join("\n");
 }
 
 /* -------------------------------------------------------------------------
@@ -84,19 +113,31 @@ const FLYER_MAX_BYTES = 900_000;
  */
 const flyerCache = new Map<string, Buffer | null>();
 
+/** Resolve coverPhotoUrl against SITE_URL. Null if either is missing. */
+function flyerUrl(event: EventDoc): string | null {
+  const site = SITE_URL.value().replace(/\/$/, "");
+  if (!site || !event.coverPhotoUrl) return null;
+  return event.coverPhotoUrl.startsWith("http")
+    ? event.coverPhotoUrl
+    : `${site}${event.coverPhotoUrl.startsWith("/") ? "" : "/"}${event.coverPhotoUrl}`;
+}
+
+function cachedFlyer(event: EventDoc): Buffer | null {
+  const url = flyerUrl(event);
+  if (!url) return null;
+  return flyerCache.get(url) ?? null;
+}
+
 /**
  * The flyer as bytes, for inlining into the email. Events store
  * `coverPhotoUrl` as a site-relative path, so this needs SITE_URL to resolve.
- * Every failure path returns null: artwork is a nice-to-have and must never
- * take down a confirmation email.
+ * Every failure path returns null: artwork is a nice-to-have. Confirmation
+ * must not await this — use `cachedFlyer` there and warm the cache with
+ * `void fetchFlyer(event)` so a slow host cannot delay the ticket.
  */
 async function fetchFlyer(event: EventDoc): Promise<Buffer | null> {
-  const site = SITE_URL.value().replace(/\/$/, "");
-  if (!site || !event.coverPhotoUrl) return null;
-
-  const url = event.coverPhotoUrl.startsWith("http")
-    ? event.coverPhotoUrl
-    : `${site}${event.coverPhotoUrl.startsWith("/") ? "" : "/"}${event.coverPhotoUrl}`;
+  const url = flyerUrl(event);
+  if (!url) return null;
 
   const cached = flyerCache.get(url);
   if (cached !== undefined) return cached;
@@ -342,7 +383,11 @@ export async function sendConfirmationEmail(params: {
 }): Promise<void> {
   const { to, attendeeName, event, qrPng, ticketRef } = params;
   const startsAt = event.startsAt.toDate();
-  const flyer = await fetchFlyer(event);
+  // Confirmation is on the registration hot path. Use a flyer only if this
+  // process already has one; otherwise send without it and warm the cache
+  // in the background so later mail (reminders, the next signup) can attach it.
+  const flyer = cachedFlyer(event);
+  void fetchFlyer(event);
   const firstName = attendeeName.trim().split(/\s+/)[0] || attendeeName;
 
   const attachments: NonNullable<CreateEmailOptions["attachments"]> = [
@@ -356,22 +401,20 @@ export async function sendConfirmationEmail(params: {
     from: RESEND_FROM_EMAIL.value(),
     to,
     subject: `You're in — ${event.name}`,
-    text: [
+    text: plainText([
       `Hi ${firstName},`,
       ``,
       `You're registered for ${event.name}.`,
       ``,
       `When: ${formatEventDate(startsAt)}${venuePlain(event)}`,
-      ticketRef ? `Ticket: ${ticketRef}` : ``,
+      ticketRef ? `Ticket: ${ticketRef}` : null,
       ``,
       `Your QR ticket is attached — show it at the door and you're in.`,
       `Entry is free, and the ticket is just for you. If you're bringing someone,`,
       `send them the link so they can get their own.`,
       ``,
       `See you there.`,
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    ]),
     html: shell({
       preheader: `Your ticket for ${event.name} on ${formatDatePart(startsAt)}.`,
       eyebrow: "You're registered",
@@ -394,13 +437,14 @@ export async function sendConfirmationEmail(params: {
 }
 
 /* -------------------------------------------------------------------------
-   Reminder — sent the day before
+   Reminder — automatic (day-before) and staff manual blasts
    ---------------------------------------------------------------------- */
 
 /**
  * Read on the way out the door, so it inverts the confirmation: time and place
  * first, artwork demoted to a small strip, and the copy assumes they already
- * know what the event is.
+ * know what the event is. "Tomorrow" is only used when the event is actually
+ * the next Accra calendar day — manual blasts can go out earlier.
  */
 export async function sendReminderEmail(params: {
   to: string;
@@ -413,6 +457,7 @@ export async function sendReminderEmail(params: {
   const startsAt = event.startsAt.toDate();
   const flyer = await fetchFlyer(event);
   const firstName = attendeeName.trim().split(/\s+/)[0] || attendeeName;
+  const tomorrow = isTomorrow(startsAt);
 
   const attachments: NonNullable<CreateEmailOptions["attachments"]> = [
     { filename: "ticket.png", content: qrPng, contentId: "ticket-qr" },
@@ -435,24 +480,26 @@ export async function sendReminderEmail(params: {
   await send({
     from: RESEND_FROM_EMAIL.value(),
     to,
-    subject: `Tomorrow: ${event.name} at ${formatTimePart(startsAt)}`,
-    text: [
+    subject: tomorrow
+      ? `Tomorrow: ${event.name} at ${formatTimePart(startsAt)}`
+      : `Reminder: ${event.name} on ${formatDatePart(startsAt)}`,
+    text: plainText([
       `Hi ${firstName},`,
       ``,
-      `${event.name} is tomorrow.`,
+      tomorrow ? `${event.name} is tomorrow.` : `${event.name} is coming up.`,
       ``,
       `When: ${formatEventDate(startsAt)}${venuePlain(event)}`,
-      ticketRef ? `Ticket: ${ticketRef}` : ``,
+      ticketRef ? `Ticket: ${ticketRef}` : null,
       ``,
       `Your QR ticket is attached — have it ready at the door.`,
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    ]),
     html: shell({
-      preheader: `${event.name} is tomorrow at ${formatTimePart(startsAt)}. Your ticket is inside.`,
-      eyebrow: "Happening tomorrow",
+      preheader: tomorrow
+        ? `${event.name} is tomorrow at ${formatTimePart(startsAt)}. Your ticket is inside.`
+        : `${event.name} is on ${formatDatePart(startsAt)} at ${formatTimePart(startsAt)}. Your ticket is inside.`,
+      eyebrow: tomorrow ? "Happening tomorrow" : "Coming up",
       eyebrowColor: GOLD,
-      heading: `${event.name} is tomorrow`,
+      heading: tomorrow ? `${event.name} is tomorrow` : `${event.name} is coming up`,
       body: [
         detailsBlock(event),
         paragraph(
