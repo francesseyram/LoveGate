@@ -12,10 +12,13 @@ export function CheckinSearch({
   search,
   onCheckIn,
   disabled,
+  emptyState,
 }: {
   search: (query: string) => RosterEntry[];
   onCheckIn: (entry: RosterEntry) => Promise<CheckinOutcome>;
   disabled?: boolean;
+  /** Shown instead of an empty list before anything is typed. */
+  emptyState?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<RosterEntry[]>([]);
@@ -59,7 +62,13 @@ export function CheckinSearch({
           {message}
         </p>
       )}
-      <ul className="mt-4 divide-y divide-cream/10 overflow-hidden rounded-[10px] border border-cream/12 bg-cream/[0.04]">
+      {!query.trim() && emptyState}
+
+      <ul
+        className={`mt-4 divide-y divide-cream/10 overflow-hidden rounded-[10px] border border-cream/12 bg-cream/[0.04] ${
+          query.trim() ? "" : "hidden"
+        }`}
+      >
         {results.map((entry) => (
           <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
             <div className="min-w-0">
