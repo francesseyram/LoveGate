@@ -121,6 +121,7 @@ export const registerForEvent = onCall<RegisterInput>(
         attendeeName: trimmedName,
         event,
         qrPng,
+        ticketRef: buildTicketRef(docRef.id),
       });
     } catch (err) {
       logger.error("Failed to send confirmation email", {
