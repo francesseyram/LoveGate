@@ -17,7 +17,7 @@ export function CheckinSearch({
   search: (query: string) => RosterEntry[];
   onCheckIn: (entry: RosterEntry) => Promise<CheckinOutcome>;
   disabled?: boolean;
-  /** Shown instead of an empty list before anything is typed. */
+  /** Shown instead of an empty list before anything is typed. Omitted while `disabled`. */
   emptyState?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
@@ -62,7 +62,7 @@ export function CheckinSearch({
           {message}
         </p>
       )}
-      {!query.trim() && emptyState}
+      {!disabled && !query.trim() && emptyState}
 
       <ul
         className={`mt-4 divide-y divide-cream/10 overflow-hidden rounded-[10px] border border-cream/12 bg-cream/[0.04] ${
