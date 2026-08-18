@@ -15,6 +15,7 @@ export { getPublishedEvents, getEvent } from "./events";
 export { registerForEvent } from "./registration";
 export { checkInByQr, checkInByRegistrationId, searchRegistrations } from "./checkin";
 export { getEventRoster, getEventStats, syncCheckIns } from "./roster";
+export { getEventDashboard, deleteRegistration } from "./dashboard";
 export {
   sendUpcomingReminders,
   triggerManualReminder,

@@ -25,7 +25,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
 export const metadata: Metadata = {
   metadataBase: siteUrl ? new URL(siteUrl) : undefined,
   title: {
-    default: "LoveGate — Love Inc events",
+    default: "LoveGate · Love Inc events",
     template: "%s · LoveGate",
   },
   description:
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "LoveGate",
-    title: "LoveGate — Love Inc events",
+    title: "LoveGate · Love Inc events",
     description:
       "Free tickets to Love Inc gatherings. Register in about a minute and show the QR code at the door.",
   },

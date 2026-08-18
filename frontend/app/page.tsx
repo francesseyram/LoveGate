@@ -115,7 +115,7 @@ function Countdown({ startsAt }: { startsAt: string }) {
           <span className="absolute inline-flex h-full w-full rounded-full bg-coral opacity-70 motion-safe:animate-ping" />
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-coral" />
         </span>
-        <span className="text-[15px] font-bold text-cream">Happening now — doors are open</span>
+        <span className="text-[15px] font-bold text-cream">Happening now, doors are open</span>
       </div>
     );
   }
@@ -526,7 +526,7 @@ const GOOD_TO_KNOW = [
   {
     icon: <TicketIcon className="h-5 w-5" />,
     title: "Every ticket is free",
-    body: "Nothing to pay, at registration or at the door. Come as you are — first time or fiftieth.",
+    body: "Nothing to pay, at registration or at the door. Come as you are, first time or fiftieth.",
   },
   {
     icon: <PinIcon className="h-5 w-5" />,

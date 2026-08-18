@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Anton, Oswald } from "next/font/google";
-import Link from "next/link";
 import { AuthGuard } from "@/components/AuthGuard";
 import { CheckinScanner } from "@/components/CheckinScanner";
 import { CheckinSearch } from "@/components/CheckinSearch";
 import { FireBackground } from "@/components/FireBackground";
+import { StaffNav } from "@/components/StaffNav";
 import { getPublishedEvents } from "@/lib/functions";
 import { useOfflineCheckin, type CheckinOutcome } from "@/lib/useOfflineCheckin";
 import type { RosterEntry } from "@/lib/offlineStore";
@@ -245,32 +245,12 @@ function CheckinTool() {
 
       <div className="relative z-10 flex min-h-screen flex-col">
         {/* Full-width operations bar: context and connection state, always visible. */}
-        <header className="border-b border-cream/10 bg-[#0D0705]/40 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-5 py-3.5 sm:px-8">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="rounded text-[13px] text-cream/45 transition hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
-              >
-                ← LoveGate
-              </Link>
-              {events.length > 0 && (
-                <select
-                  value={eventId}
-                  onChange={(e) => setEventId(e.target.value)}
-                  aria-label="Event"
-                  className="rounded-lg border border-gold/35 bg-cream/[0.06] px-3 py-1.5 font-sans text-[14px] text-cream outline-none focus:border-gold"
-                >
-                  {events.map((event) => (
-                    <option key={event.id} value={event.id} className="bg-[#22090a] text-cream">
-                      {event.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4">
+        <StaffNav
+          events={events}
+          eventId={eventId}
+          onEventChange={setEventId}
+          status={
+            <>
               {checkin.pendingCount > 0 && (
                 <span className="rounded-full border border-gold/35 bg-gold/10 px-2.5 py-1 font-[family-name:var(--font-oswald)] text-[11px] tracking-[0.12em] text-gold uppercase">
                   {checkin.pendingCount} queued
@@ -284,15 +264,9 @@ function CheckinTool() {
                   {checkin.online ? "Online" : "Offline"}
                 </span>
               </span>
-              <Link
-                href="/admin/reminders"
-                className="rounded font-[family-name:var(--font-oswald)] text-[11px] tracking-[0.12em] text-cream/50 uppercase transition hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
-              >
-                Reminders →
-              </Link>
-            </div>
-          </div>
-        </header>
+            </>
+          }
+        />
 
         <div className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 sm:py-9">
           {/* Title left, live numbers right — the two things worth a glance. */}

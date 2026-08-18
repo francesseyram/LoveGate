@@ -126,7 +126,7 @@ export function RegistrationForm({
         <div className="flex flex-col items-center">
           {result.alreadyRegistered && (
             <p className={`${alreadyBannerClass} w-full max-w-sm text-center`}>
-              You&apos;re already registered for this event — here&apos;s your ticket.
+              You&apos;re already registered for this event. Here&apos;s your ticket.
             </p>
           )}
           <QRTicket

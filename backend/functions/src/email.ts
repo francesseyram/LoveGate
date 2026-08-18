@@ -400,7 +400,7 @@ export async function sendConfirmationEmail(params: {
   await send({
     from: RESEND_FROM_EMAIL.value(),
     to,
-    subject: `You're in — ${event.name}`,
+    subject: `You're in: ${event.name}`,
     text: plainText([
       `Hi ${firstName},`,
       ``,
@@ -409,7 +409,7 @@ export async function sendConfirmationEmail(params: {
       `When: ${formatEventDate(startsAt)}${venuePlain(event)}`,
       ticketRef ? `Ticket: ${ticketRef}` : null,
       ``,
-      `Your QR ticket is attached — show it at the door and you're in.`,
+      `Your QR ticket is attached. Show it at the door and you're in.`,
       `Entry is free, and the ticket is just for you. If you're bringing someone,`,
       `send them the link so they can get their own.`,
       ``,
@@ -423,7 +423,7 @@ export async function sendConfirmationEmail(params: {
       body: [
         flyerBlock(Boolean(flyer), event),
         paragraph(
-          `Hi ${escapeHtml(firstName)}, you're on the list. Show the code below at the door — that's the whole check-in.`
+          `Hi ${escapeHtml(firstName)}, you're on the list. Show the code below at the door. That's the whole check-in.`
         ),
         ticketBlock({ ticketRef, caption: "Show this at the entrance" }),
         detailsBlock(event),
@@ -491,7 +491,7 @@ export async function sendReminderEmail(params: {
       `When: ${formatEventDate(startsAt)}${venuePlain(event)}`,
       ticketRef ? `Ticket: ${ticketRef}` : null,
       ``,
-      `Your QR ticket is attached — have it ready at the door.`,
+      `Your QR ticket is attached. Have it ready at the door.`,
     ]),
     html: shell({
       preheader: tomorrow
@@ -509,7 +509,7 @@ export async function sendReminderEmail(params: {
         flyerStrip,
         ticketLinkBlock(event),
       ].join(""),
-      footerNote: "Can't make it any more? No action needed — just don't check in.",
+      footerNote: "Can't make it any more? No action needed, just don't check in.",
     }),
     attachments,
   });
