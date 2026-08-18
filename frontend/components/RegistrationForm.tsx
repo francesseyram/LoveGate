@@ -38,6 +38,7 @@ export function RegistrationForm({
   const [school, setSchool] = useState("");
   const [phone, setPhone] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [invitedBy, setInvitedBy] = useState("");
   const [level, setLevel] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
@@ -73,6 +74,7 @@ export function RegistrationForm({
         school,
         level,
         whatsapp: whatsapp.trim() || undefined,
+        invitedBy: invitedBy.trim() || undefined,
       });
       setResult(res);
     } catch (err) {
@@ -88,6 +90,7 @@ export function RegistrationForm({
     setSchool("");
     setPhone("");
     setWhatsapp("");
+    setInvitedBy("");
     setLevel("");
     setBannerError(null);
     setResult(null);
@@ -260,6 +263,18 @@ export function RegistrationForm({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="flex flex-col gap-2 sm:col-span-2 sm:max-w-[calc(50%-10px)]">
+              <label htmlFor="reg-invited-by" className={labelClass}>
+                Who invited you?
+              </label>
+              <input
+                id="reg-invited-by"
+                placeholder="Optional"
+                value={invitedBy}
+                onChange={(e) => setInvitedBy(e.target.value)}
+                className={inputClass}
+              />
             </div>
           </div>
 

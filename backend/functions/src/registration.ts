@@ -19,12 +19,13 @@ interface RegisterInput {
   school: string;
   level: string;
   whatsapp?: string;
+  invitedBy?: string;
 }
 
 export const registerForEvent = onCall<RegisterInput>(
   { secrets: [RESEND_API_KEY] },
   async (request) => {
-    const { eventId, name, phone, email, dob, school, level, whatsapp } =
+    const { eventId, name, phone, email, dob, school, level, whatsapp, invitedBy } =
       request.data ?? ({} as RegisterInput);
 
     if (!eventId || typeof eventId !== "string") {
@@ -38,6 +39,10 @@ export const registerForEvent = onCall<RegisterInput>(
     const trimmedDob = (dob ?? "").trim();
     const trimmedSchool = (school ?? "").trim();
     const trimmedLevel = (level ?? "").trim();
+    // Free text and optional, so it is only ever trimmed and capped. Capping
+    // matters because nothing downstream validates it and it is written
+    // straight to the document.
+    const trimmedInvitedBy = (invitedBy ?? "").trim().slice(0, 120);
     if (!trimmedName) {
       throw new HttpsError("invalid-argument", "name is required");
     }
@@ -89,6 +94,7 @@ export const registerForEvent = onCall<RegisterInput>(
       school: trimmedSchool,
       level: trimmedLevel,
       whatsapp: normalizedWhatsapp,
+      invitedBy: trimmedInvitedBy,
       qrValue,
       status: "going",
       registeredAt: Timestamp.now(),

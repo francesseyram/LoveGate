@@ -35,6 +35,7 @@ export async function registerForEvent(input: {
   school: string;
   level: string;
   whatsapp?: string;
+  invitedBy?: string;
 }): Promise<RegisterForEventResult> {
   const call = httpsCallable<typeof input, RegisterForEventResult>(functions, "registerForEvent");
   const { data } = await call(input);
