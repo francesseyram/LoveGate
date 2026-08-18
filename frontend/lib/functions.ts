@@ -32,7 +32,6 @@ export async function registerForEvent(input: {
   name: string;
   phone: string;
   email: string;
-  dob: string;
   school: string;
   level: string;
   whatsapp?: string;

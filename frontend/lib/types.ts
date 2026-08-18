@@ -20,6 +20,7 @@ export interface Registration {
   name: string;
   phone: string;
   email: string;
+  /** No longer collected at registration; empty on anything registered since. */
   dob: string;
   school: string;
   level: string;

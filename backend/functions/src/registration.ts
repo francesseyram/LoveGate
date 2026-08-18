@@ -15,7 +15,7 @@ interface RegisterInput {
   name: string;
   phone: string;
   email: string;
-  dob: string;
+  dob?: string;
   school: string;
   level: string;
   whatsapp?: string;
@@ -32,6 +32,9 @@ export const registerForEvent = onCall<RegisterInput>(
     }
     const trimmedName = (name ?? "").trim();
     const trimmedEmail = (email ?? "").trim();
+    // No longer collected. Still accepted and stored so a browser running a
+    // cached copy of the old form does not have its submission dropped, and
+    // so existing registrations keep a consistent document shape.
     const trimmedDob = (dob ?? "").trim();
     const trimmedSchool = (school ?? "").trim();
     const trimmedLevel = (level ?? "").trim();
@@ -46,9 +49,6 @@ export const registerForEvent = onCall<RegisterInput>(
     const normalizedPhone = normalizePhone(phone ?? "");
     if (normalizedPhone.length < 9) {
       throw new HttpsError("invalid-argument", "a valid phone number is required");
-    }
-    if (!trimmedDob) {
-      throw new HttpsError("invalid-argument", "date of birth is required");
     }
     if (!trimmedSchool) {
       throw new HttpsError("invalid-argument", "school is required");

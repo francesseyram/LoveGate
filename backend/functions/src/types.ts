@@ -28,6 +28,7 @@ export interface RegistrationDoc {
   /** Canonical form used for duplicate detection — see phone.ts. */
   phoneKey: string;
   email: string;
+  /** No longer collected at registration; empty on anything registered since. */
   dob: string;
   school: string;
   level: string;
