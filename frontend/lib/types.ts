@@ -56,3 +56,50 @@ export interface CheckInResult {
   outcome: "checked_in" | "already_checked_in";
   registration: RegistrationSummary;
 }
+
+/* -------------------------------------------------------------------------
+   Admin dashboard
+   Mirrors backend/functions/src/dashboard.ts + analytics.ts. The buckets are
+   computed server-side so drawing a bar never requires shipping the whole
+   attendee record to the browser.
+   ---------------------------------------------------------------------- */
+
+export interface DayBucket {
+  /** yyyy-mm-dd in Accra time. */
+  date: string;
+  count: number;
+}
+
+export interface HourBucket {
+  /** Hour of day in Accra time, 0–23. */
+  hour: number;
+  count: number;
+}
+
+export interface CategoryBucket {
+  label: string;
+  count: number;
+}
+
+/** A roster row for the dashboard table: the staff summary plus signup time. */
+export interface DashboardAttendee extends RegistrationSummary {
+  registeredAt: string;
+  invitedBy: string;
+}
+
+export interface Dashboard {
+  totals: {
+    registered: number;
+    checkedIn: number;
+    yetToArrive: number;
+    registeredToday: number;
+    checkedInToday: number;
+  };
+  registrationsByDay: DayBucket[];
+  checkInsByHour: HourBucket[];
+  schools: CategoryBucket[];
+  levels: CategoryBucket[];
+  inviters: CategoryBucket[];
+  attendees: DashboardAttendee[];
+  generatedAt: string;
+}

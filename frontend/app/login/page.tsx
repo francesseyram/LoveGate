@@ -65,7 +65,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace("/checkin");
+      router.replace("/admin");
     } catch {
       setError("That email and password don't match a staff account.");
     } finally {
@@ -150,7 +150,7 @@ export default function LoginPage() {
             Staff sign-in
           </h2>
           <p className="mt-2 text-[15px] leading-relaxed text-ink/55">
-            Use the account you were given. There&apos;s no sign-up — ask a lead if you need one.
+            Use the account you were given. There&apos;s no sign-up, so ask a lead if you need one.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8">

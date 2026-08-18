@@ -1,6 +1,7 @@
 import { httpsCallable, FunctionsError } from "firebase/functions";
 import { functions } from "./firebaseClient";
 import type {
+  Dashboard,
   EventSummary,
   RegistrationSummary,
   RegisterForEventResult,
@@ -102,6 +103,24 @@ export async function syncCheckIns(input: {
     typeof input,
     { applied: string[]; alreadyCheckedIn: string[]; notFound: string[] }
   >(functions, "syncCheckIns");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function getEventDashboard(input: { eventId: string }): Promise<Dashboard> {
+  const call = httpsCallable<typeof input, Dashboard>(functions, "getEventDashboard");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function deleteRegistration(input: {
+  eventId: string;
+  registrationId: string;
+}): Promise<{ deleted: boolean; registrationId: string }> {
+  const call = httpsCallable<typeof input, { deleted: boolean; registrationId: string }>(
+    functions,
+    "deleteRegistration"
+  );
   const { data } = await call(input);
   return data;
 }

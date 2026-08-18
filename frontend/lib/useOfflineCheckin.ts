@@ -91,7 +91,7 @@ export function useOfflineCheckin(eventId: string) {
           await saveRoster(next);
           setRoster(next);
         } else if (!cached) {
-          setError("No attendee list saved for offline use — connect once to download it.");
+          setError("No attendee list saved for offline use. Connect once to download it.");
         }
       } catch (err) {
         setError(getCallableErrorMessage(err));
