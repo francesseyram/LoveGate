@@ -34,11 +34,11 @@ export function RegistrationForm({
   theme?: "neutral" | "revive";
 }) {
   const [name, setName] = useState("");
-  const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
   const [school, setSchool] = useState("");
   const [phone, setPhone] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [invitedBy, setInvitedBy] = useState("");
   const [level, setLevel] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
@@ -55,7 +55,6 @@ export function RegistrationForm({
     const phoneDigits = phone.replace(/\D/g, "");
     if (
       !trimmedName ||
-      !dob ||
       !email.includes("@") ||
       !school.trim() ||
       phoneDigits.length < 9 ||
@@ -72,10 +71,10 @@ export function RegistrationForm({
         name,
         phone,
         email,
-        dob,
         school,
         level,
         whatsapp: whatsapp.trim() || undefined,
+        invitedBy: invitedBy.trim() || undefined,
       });
       setResult(res);
     } catch (err) {
@@ -87,11 +86,11 @@ export function RegistrationForm({
 
   function reset() {
     setName("");
-    setDob("");
     setEmail("");
     setSchool("");
     setPhone("");
     setWhatsapp("");
+    setInvitedBy("");
     setLevel("");
     setBannerError(null);
     setResult(null);
@@ -189,21 +188,6 @@ export function RegistrationForm({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="reg-dob" className={labelClass}>
-                Date of birth
-              </label>
-              <input
-                id="reg-dob"
-                type="date"
-                required
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                style={{ colorScheme: isRevive ? "dark" : "light" }}
-                className={inputClass}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
               <label htmlFor="reg-email" className={labelClass}>
                 Email
               </label>
@@ -259,7 +243,7 @@ export function RegistrationForm({
               />
             </div>
 
-            <div className="flex flex-col gap-2 sm:col-span-2 sm:max-w-[calc(50%-10px)]">
+            <div className="flex flex-col gap-2">
               <label htmlFor="reg-level" className={labelClass}>
                 Level
               </label>
@@ -279,6 +263,18 @@ export function RegistrationForm({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="flex flex-col gap-2 sm:col-span-2 sm:max-w-[calc(50%-10px)]">
+              <label htmlFor="reg-invited-by" className={labelClass}>
+                Who invited you?
+              </label>
+              <input
+                id="reg-invited-by"
+                placeholder="Optional"
+                value={invitedBy}
+                onChange={(e) => setInvitedBy(e.target.value)}
+                className={inputClass}
+              />
             </div>
           </div>
 

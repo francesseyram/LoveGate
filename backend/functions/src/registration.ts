@@ -15,16 +15,17 @@ interface RegisterInput {
   name: string;
   phone: string;
   email: string;
-  dob: string;
+  dob?: string;
   school: string;
   level: string;
   whatsapp?: string;
+  invitedBy?: string;
 }
 
 export const registerForEvent = onCall<RegisterInput>(
   { secrets: [RESEND_API_KEY] },
   async (request) => {
-    const { eventId, name, phone, email, dob, school, level, whatsapp } =
+    const { eventId, name, phone, email, dob, school, level, whatsapp, invitedBy } =
       request.data ?? ({} as RegisterInput);
 
     if (!eventId || typeof eventId !== "string") {
@@ -32,9 +33,16 @@ export const registerForEvent = onCall<RegisterInput>(
     }
     const trimmedName = (name ?? "").trim();
     const trimmedEmail = (email ?? "").trim();
+    // No longer collected. Still accepted and stored so a browser running a
+    // cached copy of the old form does not have its submission dropped, and
+    // so existing registrations keep a consistent document shape.
     const trimmedDob = (dob ?? "").trim();
     const trimmedSchool = (school ?? "").trim();
     const trimmedLevel = (level ?? "").trim();
+    // Free text and optional, so it is only ever trimmed and capped. Capping
+    // matters because nothing downstream validates it and it is written
+    // straight to the document.
+    const trimmedInvitedBy = (invitedBy ?? "").trim().slice(0, 120);
     if (!trimmedName) {
       throw new HttpsError("invalid-argument", "name is required");
     }
@@ -46,9 +54,6 @@ export const registerForEvent = onCall<RegisterInput>(
     const normalizedPhone = normalizePhone(phone ?? "");
     if (normalizedPhone.length < 9) {
       throw new HttpsError("invalid-argument", "a valid phone number is required");
-    }
-    if (!trimmedDob) {
-      throw new HttpsError("invalid-argument", "date of birth is required");
     }
     if (!trimmedSchool) {
       throw new HttpsError("invalid-argument", "school is required");
@@ -89,6 +94,7 @@ export const registerForEvent = onCall<RegisterInput>(
       school: trimmedSchool,
       level: trimmedLevel,
       whatsapp: normalizedWhatsapp,
+      invitedBy: trimmedInvitedBy,
       qrValue,
       status: "going",
       registeredAt: Timestamp.now(),

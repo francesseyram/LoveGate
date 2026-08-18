@@ -28,10 +28,17 @@ export interface RegistrationDoc {
   /** Canonical form used for duplicate detection — see phone.ts. */
   phoneKey: string;
   email: string;
+  /** No longer collected at registration; empty on anything registered since. */
   dob: string;
   school: string;
   level: string;
   whatsapp: string;
+  /**
+   * Who invited them, as they typed it. Optional at the form, and absent
+   * entirely on anything registered before the field existed, so every read
+   * has to tolerate undefined rather than assume an empty string.
+   */
+  invitedBy?: string;
   qrValue: string;
   status: RegistrationStatus;
   registeredAt: Timestamp;
@@ -65,6 +72,7 @@ export interface RegistrationDTO {
   school: string;
   level: string;
   whatsapp: string;
+  invitedBy: string;
   qrValue: string;
   status: RegistrationStatus;
   registeredAt: string;
@@ -124,6 +132,7 @@ export function registrationToDTO(id: string, doc: RegistrationDoc): Registratio
     school: doc.school,
     level: doc.level,
     whatsapp: doc.whatsapp,
+    invitedBy: doc.invitedBy ?? "",
     qrValue: doc.qrValue,
     status: doc.status,
     registeredAt: doc.registeredAt.toDate().toISOString(),
