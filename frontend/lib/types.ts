@@ -84,6 +84,7 @@ export interface CategoryBucket {
 /** A roster row for the dashboard table: the staff summary plus signup time. */
 export interface DashboardAttendee extends RegistrationSummary {
   registeredAt: string;
+  invitedBy: string;
 }
 
 export interface Dashboard {
@@ -98,6 +99,7 @@ export interface Dashboard {
   checkInsByHour: HourBucket[];
   schools: CategoryBucket[];
   levels: CategoryBucket[];
+  inviters: CategoryBucket[];
   attendees: DashboardAttendee[];
   generatedAt: string;
 }

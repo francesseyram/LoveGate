@@ -20,9 +20,17 @@ function requireStaff(request: CallableRequest<unknown>): string {
   return request.auth.uid;
 }
 
-/** The roster row the dashboard table needs — a summary plus when they signed up. */
+/**
+ * The roster row the dashboard table needs: the door's summary, plus signup
+ * time and who invited them.
+ *
+ * Widened here rather than in RegistrationSummaryDTO on purpose. The summary is
+ * what the check-in desk receives, and the door has no use for a referral — the
+ * narrower that payload stays, the less a compromised volunteer login is worth.
+ */
 export interface DashboardAttendeeDTO extends RegistrationSummaryDTO {
   registeredAt: string;
+  invitedBy: string;
 }
 
 export interface DashboardDTO {
@@ -37,6 +45,7 @@ export interface DashboardDTO {
   checkInsByHour: HourBucket[];
   schools: CategoryBucket[];
   levels: CategoryBucket[];
+  inviters: CategoryBucket[];
   attendees: DashboardAttendeeDTO[];
   generatedAt: string;
 }
@@ -70,6 +79,7 @@ export const getEventDashboard = onCall<{ eventId: string }>(async (request) => 
   const checkedInDates: Date[] = [];
   const schools: string[] = [];
   const levels: string[] = [];
+  const inviters: string[] = [];
   const attendees: DashboardAttendeeDTO[] = [];
 
   let checkedIn = 0;
@@ -87,6 +97,7 @@ export const getEventDashboard = onCall<{ eventId: string }>(async (request) => 
 
     if (data.school) schools.push(data.school);
     if (data.level) levels.push(data.level);
+    if (data.invitedBy) inviters.push(data.invitedBy);
 
     if (data.status === "checked_in") {
       checkedIn += 1;
@@ -100,6 +111,8 @@ export const getEventDashboard = onCall<{ eventId: string }>(async (request) => 
     attendees.push({
       ...registrationToSummary(doc.id, data),
       registeredAt: registeredAt ? registeredAt.toISOString() : "",
+      // Absent on anything registered before the field existed.
+      invitedBy: data.invitedBy ?? "",
     });
   }
 
@@ -121,6 +134,7 @@ export const getEventDashboard = onCall<{ eventId: string }>(async (request) => 
     checkInsByHour: buildHourSeries(checkedInDates),
     schools: topCategories(schools),
     levels: topCategories(levels, 8),
+    inviters: topCategories(inviters, 8),
     attendees,
     generatedAt: Timestamp.now().toDate().toISOString(),
   };

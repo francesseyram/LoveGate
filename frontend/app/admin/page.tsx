@@ -224,7 +224,10 @@ function AttendeeTable({
       return (
         person.name.toLowerCase().includes(q) ||
         person.email.toLowerCase().includes(q) ||
-        person.ticketRef.toLowerCase().includes(q)
+        person.ticketRef.toLowerCase().includes(q) ||
+        // Matching the inviter turns the search box into "show me everyone
+        // Ama brought", which is the question a referral field exists to answer.
+        person.invitedBy.toLowerCase().includes(q)
       );
     });
   }, [attendees, query, status]);
@@ -298,7 +301,7 @@ function AttendeeTable({
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search name, email or ticket…"
+          placeholder="Search name, email, ticket or inviter…"
           aria-label="Search attendees"
           className="w-full rounded-xl border border-cream/15 bg-cream/[0.04] px-4 py-2 text-[14px] text-cream placeholder:text-cream/30 outline-none focus:border-gold sm:w-72"
         />
@@ -388,11 +391,14 @@ function AttendeeTable({
                     className="h-4 w-4 accent-[#B23A48]"
                   />
                 </th>
-                <th scope="col" className="px-3 py-2.5 font-medium">
+                <th scope="col" className="w-[34%] px-3 py-2.5 font-medium">
                   Name
                 </th>
                 <th scope="col" className="hidden px-3 py-2.5 font-medium sm:table-cell">
                   Ticket
+                </th>
+                <th scope="col" className="hidden w-[20%] px-3 py-2.5 font-medium lg:table-cell">
+                  Invited by
                 </th>
                 <th scope="col" className="hidden px-3 py-2.5 font-medium md:table-cell">
                   Registered
@@ -428,6 +434,13 @@ function AttendeeTable({
                     </td>
                     <td className="hidden px-3 py-2.5 align-top font-[family-name:var(--font-oswald)] text-[12.5px] text-cream/45 tabular-nums sm:table-cell">
                       {person.ticketRef}
+                    </td>
+                    <td className="hidden max-w-[1px] truncate px-3 py-2.5 align-top text-[12.5px] lg:table-cell">
+                      {person.invitedBy ? (
+                        <span className="text-cream/60">{person.invitedBy}</span>
+                      ) : (
+                        <span className="text-cream/25">Nobody named</span>
+                      )}
                     </td>
                     <td className="hidden px-3 py-2.5 align-top text-[12.5px] text-cream/45 tabular-nums md:table-cell">
                       {whenRegistered(person.registeredAt)}
@@ -634,6 +647,18 @@ function DashboardTool() {
                 </Card>
               </div>
 
+              <Card
+                title="Who is bringing people"
+                hint={`${data.attendees.filter((person) => person.invitedBy).length} named someone`}
+              >
+                <BarList
+                  items={data.inviters}
+                  color={CHART_GOLD}
+                  total={data.totals.registered}
+                  empty="Nobody has named an inviter yet."
+                />
+              </Card>
+
               <div className="grid gap-5 lg:grid-cols-2">
                 <Card title="Schools" hint={`${data.totals.registered} registered`}>
                   <BarList
@@ -654,11 +679,7 @@ function DashboardTool() {
                 </Card>
               </div>
 
-              <AttendeeTable
-                attendees={data.attendees}
-                eventId={eventId}
-                onChanged={refresh}
-              />
+              <AttendeeTable attendees={data.attendees} eventId={eventId} onChanged={refresh} />
             </div>
           )}
         </div>

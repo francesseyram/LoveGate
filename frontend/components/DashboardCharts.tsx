@@ -131,15 +131,26 @@ export function ColumnChart({
         <div aria-hidden className="h-px w-full bg-cream/12" />
       </div>
 
-      <div aria-hidden className="mt-2 flex gap-[2px]">
-        {columns.map((column, index) => (
-          <span
-            key={column.key}
-            className="flex-1 truncate text-center font-[family-name:var(--font-oswald)] text-[10.5px] tracking-[0.06em] text-cream/35 tabular-nums"
-          >
-            {showsTick(index) ? column.tick : ""}
-          </span>
-        ))}
+      {/* Ticks sit over the axis rather than inside their own column. Confined
+          to one ~30px flex cell, "10 Aug" truncated to "10 A…" even though the
+          gap to the next label was enormous. The calc mirrors the plot's track
+          maths so each label stays centred on its column. */}
+      <div aria-hidden className="relative mt-2 h-4">
+        {columns.map((column, index) =>
+          showsTick(index) ? (
+            <span
+              key={column.key}
+              className="absolute -translate-x-1/2 font-[family-name:var(--font-oswald)] text-[10.5px] tracking-[0.06em] whitespace-nowrap text-cream/35 tabular-nums"
+              style={{
+                left: `calc((100% - ${(columns.length - 1) * 2}px) / ${columns.length} * ${
+                  index + 0.5
+                } + ${index * 2}px)`,
+              }}
+            >
+              {column.tick}
+            </span>
+          ) : null,
+        )}
       </div>
 
       <details className="group mt-4">
@@ -199,26 +210,27 @@ export function BarList({
     );
   }
 
-  const max = Math.max(...items.map((item) => item.count));
-
   return (
     <ul className="mt-4 flex flex-col gap-3.5">
       {items.map((item) => {
-        const share = total > 0 ? Math.round((item.count / total) * 100) : 0;
+        const share = total > 0 ? (item.count / total) * 100 : 0;
         return (
           <li key={item.label}>
             <div className="flex items-baseline justify-between gap-3">
               <span className="truncate text-[13.5px] text-cream/75">{item.label}</span>
               <span className="shrink-0 font-[family-name:var(--font-oswald)] text-[12.5px] text-cream/60 tabular-nums">
                 {item.count}
-                <span className="text-cream/30"> · {share}%</span>
+                <span className="text-cream/30"> · {Math.round(share)}%</span>
               </span>
             </div>
+            {/* Width is the share of everyone, not of the biggest row. Scaling
+                to the leader drew the top row full-width beside a label reading
+                "17%", which is the kind of chart that gets quoted wrong. */}
             <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-cream/8">
               <div
                 className="h-full rounded-full transition-[width] duration-500"
                 style={{
-                  width: `${(item.count / max) * 100}%`,
+                  width: `${Math.min(100, share)}%`,
                   background: color,
                 }}
               />
