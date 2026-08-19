@@ -45,6 +45,11 @@ const dataDir = dirArg
  * worth it either.
  */
 function parseCsv(text) {
+  // Excel's "CSV UTF-8" export writes a BOM as the first character. Left in
+  // place it prefixes the first header cell, and mapHeaders then misses the
+  // name column ("no name column found") before any members are imported.
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+
   const rows = [];
   let row = [];
   let field = "";

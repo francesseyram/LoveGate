@@ -20,6 +20,11 @@ describe("mapHeaders", () => {
     expect(mapHeaders(["NAME", "MOBILE", "WHATSAPP", "DOB", "LOCATION"]))
       .toMatchObject({ fullName: 0, phone: 1, whatsapp: 2, dob: 3, hostel: 4 });
   });
+
+  it("still finds the name column when Excel's UTF-8 BOM prefixes the first heading", () => {
+    expect(mapHeaders(["\uFEFFNAME", "MOBILE"])).toMatchObject({ fullName: 0, phone: 1 });
+    expect(mapHeaders(["\uFEFFFull Name", "Phone Number"])).toMatchObject({ fullName: 0, phone: 1 });
+  });
 });
 
 describe("mapRow", () => {

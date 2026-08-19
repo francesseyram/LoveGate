@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Anton, Oswald } from "next/font/google";
 import { AuthGuard } from "@/components/AuthGuard";
 import { FireBackground } from "@/components/FireBackground";
@@ -481,6 +481,8 @@ function DashboardTool() {
   const [snapshot, setSnapshot] = useState<{ eventId: string; dashboard: Dashboard } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const eventIdRef = useRef(eventId);
+  eventIdRef.current = eventId;
 
   useEffect(() => {
     let active = true;
@@ -507,6 +509,8 @@ function DashboardTool() {
   useEffect(() => {
     if (!eventId) return;
     let active = true;
+    setRefreshing(false);
+    setError(null);
     void (async () => {
       try {
         const dashboard = await getEventDashboard({ eventId });
@@ -523,16 +527,19 @@ function DashboardTool() {
   }, [eventId]);
 
   const refresh = useCallback(async () => {
-    if (!eventId) return;
+    const requestedId = eventId;
+    if (!requestedId) return;
     setRefreshing(true);
     try {
-      const dashboard = await getEventDashboard({ eventId });
-      setSnapshot({ eventId, dashboard });
+      const dashboard = await getEventDashboard({ eventId: requestedId });
+      if (eventIdRef.current !== requestedId) return;
+      setSnapshot({ eventId: requestedId, dashboard });
       setError(null);
     } catch (err) {
+      if (eventIdRef.current !== requestedId) return;
       setError(getCallableErrorMessage(err));
     } finally {
-      setRefreshing(false);
+      if (eventIdRef.current === requestedId) setRefreshing(false);
     }
   }, [eventId]);
 
