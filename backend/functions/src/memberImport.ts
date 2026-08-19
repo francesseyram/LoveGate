@@ -46,6 +46,17 @@ export const MEMBER_SOURCES: Record<string, MemberSource> = {
   "ashesi-misc": { slug: "ashesi-misc", campus: "Ashesi", priority: 50, dateOrder: "dmy" },
 };
 
+/**
+ * Numbers where two entirely unlike names turned out to be one person, checked
+ * by hand against the sheets. Without this the merge is still correct, but it
+ * re-raises `needsReview` on every import and someone has to re-decide it —
+ * so the answer is recorded here once. Both spellings stay in `aka`.
+ */
+const CONFIRMED_SAME_PERSON = new Set([
+  "233503879141", // Sedem Kporvi / Nana Yaw Muzzu   (ashesi-c2027)
+  "233206723467", // Addey / innocent                (loveinc-members)
+]);
+
 /** Column headings, as literally typed across the twelve sheets. */
 const COLUMNS: Record<string, string[]> = {
   fullName: ["name", "full name", "names"],
@@ -254,7 +265,7 @@ export function mergeMembers(existing: MemberRecord, incoming: MemberRecord): Me
   // overlap ("Ben" / "Benedict Arthur") are the same person; names with
   // nothing in common are a data-entry error worth a human look, so the merge
   // still happens but gets flagged instead of quietly hiding one of them.
-  if (!sharesNameToken(existing.fullName, incoming.fullName)) {
+  if (!sharesNameToken(existing.fullName, incoming.fullName) && !CONFIRMED_SAME_PERSON.has(merged.phoneKey)) {
     const note = `merged with "${loser.fullName}" (${sheetOf(loser)}) on phone ${merged.phone} ` +
       `but the names have nothing in common — check for a mistyped number`;
     merged.reviewNotes.push(note);

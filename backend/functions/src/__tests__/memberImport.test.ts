@@ -130,8 +130,8 @@ describe("mergeMembers", () => {
   });
 
   it("flags a merge between two people who share nothing but a number", () => {
-    const one = row(["Name", "Mobile"], ["Sedem Kporvi", "0503879141"], ashesi, 48);
-    const other = row(["Name", "Mobile"], ["Nana Yaw Muzzu", "0503879141"], ashesi, 49);
+    const one = row(["Name", "Mobile"], ["Sedem Kporvi", "0201111111"], ashesi, 48);
+    const other = row(["Name", "Mobile"], ["Nana Yaw Muzzu", "0201111111"], ashesi, 49);
     const { merged, log } = mergeMembers(one, other);
 
     expect(merged.needsReview).toBe(true);
@@ -165,5 +165,17 @@ describe("toMemberDoc", () => {
     const doc = toMemberDoc(row(["Name", "Mobile"], ["Ama Owusu", "0201234567"], legon, 9));
     expect(doc).not.toHaveProperty("priority");
     expect(doc.sourceCount).toBe(1);
+  });
+});
+
+describe("confirmed aliases", () => {
+  it("stops re-flagging a mismatch someone has already checked by hand", () => {
+    const sheet = MEMBER_SOURCES["ashesi-c2027"];
+    const one = row(["Name", "Mobile"], ["Sedem Kporvi", "0503879141"], sheet, 48);
+    const other = row(["Name", "Mobile"], ["Nana Yaw Muzzu", "0503879141"], sheet, 49);
+    const { merged } = mergeMembers(one, other);
+
+    expect(merged.needsReview).toBe(false);
+    expect(merged.aka).toEqual(["Sedem Kporvi"]);
   });
 });
