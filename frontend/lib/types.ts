@@ -105,3 +105,12 @@ export interface Dashboard {
   attendees: DashboardAttendee[];
   generatedAt: string;
 }
+
+/** One row on the public self check-in page. Deliberately narrow — see backend/src/selfCheckin.ts. */
+export interface SelfCheckinMatch {
+  key: string;
+  name: string;
+  campus: string;
+  maskedPhone: string;
+  alreadyCheckedIn: boolean;
+}

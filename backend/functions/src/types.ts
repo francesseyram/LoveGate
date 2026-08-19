@@ -47,6 +47,10 @@ export interface RegistrationDoc {
   checkedInBy: string | null;
   /** Set only after a confirmed reminder send — the per-person idempotency key. */
   remindedAt?: Timestamp | null;
+  /** "self_checkin" when the row was created at the door, absent when registered normally. */
+  source?: string;
+  /** Links back to member_db when this row was raised from a member record. */
+  memberId?: string;
 }
 
 /** Wire-format sent to the client: Firestore Timestamps become ISO strings. */
