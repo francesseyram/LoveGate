@@ -85,6 +85,8 @@ export interface CategoryBucket {
 export interface DashboardAttendee extends RegistrationSummary {
   registeredAt: string;
   invitedBy: string;
+  /** Dashboard-only — deliberately absent from the check-in desk's payload. */
+  phone: string;
 }
 
 export interface Dashboard {
