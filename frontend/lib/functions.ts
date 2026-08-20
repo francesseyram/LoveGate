@@ -2,10 +2,12 @@ import { httpsCallable, FunctionsError } from "firebase/functions";
 import { functions } from "./firebaseClient";
 import type {
   Dashboard,
+  EventSettings,
   EventSummary,
   RegistrationSummary,
   RegisterForEventResult,
   CheckInResult,
+  UndoCheckInResult,
 } from "./types";
 import type { RosterEntry } from "./offlineStore";
 
@@ -69,6 +71,30 @@ export async function checkInByRegistrationId(input: {
   registrationId: string;
 }): Promise<CheckInResult> {
   const call = httpsCallable<typeof input, CheckInResult>(functions, "checkInByRegistrationId");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function undoCheckIn(input: {
+  eventId: string;
+  registrationId: string;
+}): Promise<UndoCheckInResult> {
+  const call = httpsCallable<typeof input, UndoCheckInResult>(functions, "undoCheckIn");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function getEventSettings(input: { eventId: string }): Promise<EventSettings> {
+  const call = httpsCallable<typeof input, EventSettings>(functions, "getEventSettings");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function setEventAutoCheckIn(input: {
+  eventId: string;
+  enabled: boolean;
+}): Promise<EventSettings> {
+  const call = httpsCallable<typeof input, EventSettings>(functions, "setEventAutoCheckIn");
   const { data } = await call(input);
   return data;
 }

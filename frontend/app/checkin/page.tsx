@@ -357,6 +357,7 @@ function CheckinTool() {
                   <CheckinSearch
                     search={checkin.search}
                     onCheckIn={checkin.checkIn}
+                    onUndoCheckIn={checkin.undoCheckIn}
                     disabled={!rosterReady}
                     emptyState={<RecentArrivals entries={checkin.roster?.entries ?? []} />}
                   />

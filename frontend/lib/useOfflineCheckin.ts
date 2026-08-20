@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { getEventRoster, syncCheckIns, getCallableErrorMessage } from "./functions";
+import {
+  getEventRoster,
+  syncCheckIns,
+  undoCheckIn as undoCheckInCall,
+  getCallableErrorMessage,
+} from "./functions";
 import {
   saveRoster,
   loadRoster,
@@ -9,6 +14,7 @@ import {
   getQueue,
   removeFromQueue,
   markRosterEntryCheckedIn,
+  markRosterEntryNotCheckedIn,
   type CachedRoster,
   type RosterEntry,
 } from "./offlineStore";
@@ -17,6 +23,11 @@ export type CheckinOutcome =
   | { result: "checked_in"; name: string; offline: boolean }
   | { result: "already_checked_in"; name: string; offline: boolean }
   | { result: "not_found" };
+
+export type UndoOutcome =
+  | { result: "reverted"; name: string }
+  | { result: "not_checked_in"; name: string }
+  | { result: "failed"; name: string; message: string };
 
 /** Connectivity is external browser state, so subscribe to it rather than mirroring it into an effect. */
 function subscribeToConnectivity(onChange: () => void) {
@@ -179,6 +190,58 @@ export function useOfflineCheckin(eventId: string) {
     [eventId, refreshPendingCount, sync]
   );
 
+  /**
+   * Puts someone back to "not arrived" after a mistaken check-in.
+   *
+   * Unlike checkIn this waits on the server and refuses to run offline. A
+   * check-in can be replayed later because it is additive; an undo cannot,
+   * because the queue it would have to fight with is a queue of check-ins —
+   * revert locally while a scan for the same person is still pending and the
+   * next sync silently re-checks them in.
+   *
+   * Dropping the pending scan first is what makes that safe: if their check-in
+   * never reached the server, the undo is complete the moment it leaves the
+   * queue, and the call below just confirms it.
+   */
+  const undo = useCallback(
+    async (entry: RosterEntry): Promise<UndoOutcome> => {
+      if (entry.status !== "checked_in") {
+        return { result: "not_checked_in", name: entry.name };
+      }
+      if (!navigator.onLine) {
+        return {
+          result: "failed",
+          name: entry.name,
+          message: "Undo needs a connection. Try again once you are back online.",
+        };
+      }
+
+      await removeFromQueue([`${eventId}:${entry.id}`]);
+      await refreshPendingCount();
+
+      try {
+        await undoCheckInCall({ eventId, registrationId: entry.id });
+      } catch (err) {
+        return { result: "failed", name: entry.name, message: getCallableErrorMessage(err) };
+      }
+
+      await markRosterEntryNotCheckedIn(eventId, entry.id);
+      setRoster((prev) =>
+        prev
+          ? {
+              ...prev,
+              entries: prev.entries.map((e) =>
+                e.id === entry.id ? { ...e, status: "going" as const, checkedInAt: null } : e
+              ),
+            }
+          : prev
+      );
+
+      return { result: "reverted", name: entry.name };
+    },
+    [eventId, refreshPendingCount]
+  );
+
   return {
     roster,
     online,
@@ -190,6 +253,7 @@ export function useOfflineCheckin(eventId: string) {
     findByQr,
     search,
     checkIn,
+    undoCheckIn: undo,
     sync,
     reloadRoster: () => loadEventRoster(true),
   };

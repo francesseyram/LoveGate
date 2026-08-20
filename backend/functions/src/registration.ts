@@ -8,7 +8,7 @@ import { isEventCurrent } from "./eventWindow";
 import { buildSearchPrefixes, buildTicketRef, registrationDocId } from "./search";
 import { makeQrValue, generateQrPngBuffer, generateQrDataUrl } from "./qr";
 import { sendConfirmationEmail } from "./email";
-import { EventDoc, RegistrationDoc, registrationToDTO } from "./types";
+import { AUTO_CHECKIN_ACTOR, EventDoc, RegistrationDoc, registrationToDTO } from "./types";
 
 interface RegisterInput {
   eventId: string;
@@ -78,6 +78,14 @@ export const registerForEvent = onCall<RegisterInput>(
       throw new HttpsError("failed-precondition", "Registration for this event has closed");
     }
 
+    // Late-arrival mode. Once the doors are open, staff flip this on and anyone
+    // still registering is standing in front of them — issuing a ticket they
+    // then have to queue up and scan is a queue for nothing. Applies to new
+    // registrations only: someone re-opening the form from home to find their
+    // ticket again hits the alreadyRegistered path below and is not in the room.
+    const autoCheckIn = event.autoCheckIn === true;
+    const registeredAt = Timestamp.now();
+
     // Deterministic id keyed on the phone, so a duplicate submit collides in
     // the database instead of racing a read-then-write check.
     const docRef = db.collection("registrations").doc(registrationDocId(eventId, phoneKey));
@@ -96,10 +104,10 @@ export const registerForEvent = onCall<RegisterInput>(
       whatsapp: normalizedWhatsapp,
       invitedBy: trimmedInvitedBy,
       qrValue,
-      status: "going",
-      registeredAt: Timestamp.now(),
-      checkedInAt: null,
-      checkedInBy: null,
+      status: autoCheckIn ? "checked_in" : "going",
+      registeredAt,
+      checkedInAt: autoCheckIn ? registeredAt : null,
+      checkedInBy: autoCheckIn ? AUTO_CHECKIN_ACTOR : null,
     };
 
     try {

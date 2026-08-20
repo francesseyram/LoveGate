@@ -1,9 +1,10 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { Timestamp } from "firebase-admin/firestore";
+import * as logger from "firebase-functions/logger";
 import { db } from "./admin";
 import { RegistrationDoc, registrationToSummary } from "./types";
 
-function requireStaff(request: CallableRequest<unknown>): string {
+export function requireStaff(request: CallableRequest<unknown>): string {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Staff sign-in required");
   }
@@ -81,6 +82,71 @@ export const checkInByRegistrationId = onCall<CheckInByIdInput>(async (request) 
   }
 
   return markCheckedIn(docRef, registration, staffUid);
+});
+
+interface UndoCheckInInput {
+  eventId: string;
+  registrationId: string;
+}
+
+/**
+ * Puts someone back to "not arrived".
+ *
+ * Check-ins get made in error constantly at a real door — a volunteer taps the
+ * row above the one they meant, two people share a name, someone scans a
+ * friend's screenshot, or late-arrival mode admits a person who registered from
+ * home. Without this the only fix was deleting the registration, which throws
+ * away a real attendee's ticket to correct a one-tap mistake.
+ *
+ * The arrival time is cleared rather than kept: `checkedInAt` is what the
+ * arrivals-by-hour chart plots, and a reverted check-in was never an arrival.
+ */
+export const undoCheckIn = onCall<UndoCheckInInput>(async (request) => {
+  const staffUid = requireStaff(request);
+  const { eventId, registrationId } = request.data ?? ({} as UndoCheckInInput);
+  if (!eventId || !registrationId) {
+    throw new HttpsError("invalid-argument", "eventId and registrationId are required");
+  }
+
+  const docRef = db.collection("registrations").doc(registrationId);
+  const snap = await docRef.get();
+  if (!snap.exists) {
+    throw new HttpsError("not-found", "Registration not found");
+  }
+
+  const registration = snap.data() as RegistrationDoc;
+  if (registration.eventId !== eventId) {
+    throw new HttpsError("not-found", "This registration is not for the selected event");
+  }
+
+  // Not an error. Two staff phones can undo the same row, and a queued offline
+  // check-in can land after an undo — both should settle, not throw.
+  if (registration.status !== "checked_in") {
+    return {
+      outcome: "not_checked_in" as const,
+      registration: registrationToSummary(docRef.id, registration),
+    };
+  }
+
+  await docRef.update({ status: "going", checkedInAt: null, checkedInBy: null });
+
+  logger.info("Reverted check-in", {
+    eventId,
+    registrationId,
+    name: registration.name,
+    wasCheckedInBy: registration.checkedInBy,
+    revertedBy: staffUid,
+  });
+
+  return {
+    outcome: "reverted" as const,
+    registration: registrationToSummary(docRef.id, {
+      ...registration,
+      status: "going",
+      checkedInAt: null,
+      checkedInBy: null,
+    }),
+  };
 });
 
 interface SearchInput {

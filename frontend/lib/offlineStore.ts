@@ -102,3 +102,24 @@ export async function markRosterEntryCheckedIn(
   );
   await saveRoster({ ...roster, entries: next });
 }
+
+/**
+ * Reverts someone to "not arrived" in the cached roster.
+ *
+ * The counterpart to markRosterEntryCheckedIn, and only ever reached with a
+ * connection: undoing has to be dequeued and confirmed by the server, so unlike
+ * a check-in it is never recorded offline for later.
+ */
+export async function markRosterEntryNotCheckedIn(
+  eventId: string,
+  registrationId: string
+): Promise<void> {
+  const roster = await loadRoster(eventId);
+  if (!roster) return;
+  const next = roster.entries.map((entry) =>
+    entry.id === registrationId
+      ? { ...entry, status: "going" as const, checkedInAt: null }
+      : entry
+  );
+  await saveRoster({ ...roster, entries: next });
+}

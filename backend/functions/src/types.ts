@@ -4,6 +4,12 @@ import { buildTicketRef } from "./search";
 export type EventStatus = "draft" | "published";
 export type RegistrationStatus = "going" | "checked_in";
 
+/**
+ * Stands in for a staff uid on registrations that late-arrival mode checked in
+ * by itself. A real uid would claim a volunteer scanned them, which nobody did.
+ */
+export const AUTO_CHECKIN_ACTOR = "auto:late-arrival";
+
 export interface EventDoc {
   name: string;
   slug: string;
@@ -15,6 +21,14 @@ export interface EventDoc {
   locationUrl?: string;
   status: EventStatus;
   reminderSentAt?: Timestamp | null;
+  /**
+   * Late-arrival mode. While true, `registerForEvent` writes new registrations
+   * straight in as `checked_in` — see registration.ts. Absent on every event
+   * created before the flag existed, so reads must treat undefined as off.
+   */
+  autoCheckIn?: boolean;
+  autoCheckInSince?: Timestamp | null;
+  autoCheckInSetBy?: string | null;
 }
 
 export interface RegistrationDoc {
@@ -43,7 +57,10 @@ export interface RegistrationDoc {
   status: RegistrationStatus;
   registeredAt: Timestamp;
   checkedInAt: Timestamp | null;
-  /** Which staff account performed the check-in. */
+  /**
+   * Which staff account performed the check-in, or `AUTO_CHECKIN_ACTOR` when
+   * nobody did and late-arrival mode checked them in at registration.
+   */
   checkedInBy: string | null;
   /** Set only after a confirmed reminder send — the per-person idempotency key. */
   remindedAt?: Timestamp | null;

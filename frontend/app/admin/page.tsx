@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Anton, Oswald } from "next/font/google";
 import { AuthGuard } from "@/components/AuthGuard";
+import { AutoCheckInSwitch } from "@/components/AutoCheckInSwitch";
 import { FireBackground } from "@/components/FireBackground";
 import { StaffNav } from "@/components/StaffNav";
 import {
@@ -18,6 +19,7 @@ import {
   getCallableErrorMessage,
   getEventDashboard,
   getPublishedEvents,
+  undoCheckIn,
 } from "@/lib/functions";
 import type { Dashboard, DashboardAttendee, EventSummary } from "@/lib/types";
 
@@ -199,6 +201,10 @@ type StatusFilter = "all" | "checked_in" | "going";
  * Deletion is here rather than on the check-in console on purpose: at the door
  * the destructive action sits one mis-tap from the check-in button, and a
  * volunteer under queue pressure should not be able to reach it at all.
+ *
+ * Undoing a check-in sits next to it but is a different weight of action —
+ * reversible by checking the person in again — so it stays a single click with
+ * no confirmation, where deleting takes a selection and a confirmation.
  */
 function AttendeeTable({
   attendees,
@@ -214,6 +220,7 @@ function AttendeeTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const rows = useMemo(() => {
@@ -253,6 +260,19 @@ function AttendeeTable({
       else visibleIds.forEach((id) => next.add(id));
       return next;
     });
+  }
+
+  async function handleUndoCheckIn(person: DashboardAttendee) {
+    setUndoingId(person.id);
+    setError(null);
+    try {
+      await undoCheckIn({ eventId, registrationId: person.id });
+      await onChanged();
+    } catch (err) {
+      setError(`Could not undo ${person.name}'s check-in. ${getCallableErrorMessage(err)}`);
+    } finally {
+      setUndoingId(null);
+    }
   }
 
   async function handleDelete() {
@@ -447,10 +467,20 @@ function AttendeeTable({
                     </td>
                     <td className="px-3 py-2.5 align-top">
                       {person.status === "checked_in" ? (
-                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-sage">
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage" />
-                          {person.checkedInAt ? timeOfDay(person.checkedInAt) : "In"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-sage">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage" />
+                            {person.checkedInAt ? timeOfDay(person.checkedInAt) : "In"}
+                          </span>
+                          <button
+                            onClick={() => void handleUndoCheckIn(person)}
+                            disabled={undoingId === person.id}
+                            title={`Mark ${person.name} as not arrived`}
+                            className="rounded border border-cream/15 px-2 py-0.5 text-[11.5px] whitespace-nowrap text-cream/40 transition hover:border-gold/40 hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold disabled:opacity-40"
+                          >
+                            {undoingId === person.id ? "Undoing…" : "Undo"}
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-[12.5px] whitespace-nowrap text-cream/35">
                           Not arrived
@@ -633,6 +663,8 @@ function DashboardTool() {
               <div className="rounded-2xl border border-cream/12 bg-[#0D0705]/50 px-5 py-4">
                 <RoomFill checkedIn={data.totals.checkedIn} total={data.totals.registered} />
               </div>
+
+              <AutoCheckInSwitch eventId={eventId} onChanged={refresh} />
 
               <div className="grid gap-5 lg:grid-cols-2">
                 <Card title="Signups per day" hint="Accra time">
