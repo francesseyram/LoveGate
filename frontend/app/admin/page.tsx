@@ -22,6 +22,7 @@ import {
   undoCheckIn,
 } from "@/lib/functions";
 import type { Dashboard, DashboardAttendee, EventSummary } from "@/lib/types";
+import { markRosterEntryNotCheckedIn, removeFromQueue } from "@/lib/offlineStore";
 
 /**
  * The dashboard.
@@ -266,6 +267,11 @@ function AttendeeTable({
     setUndoingId(person.id);
     setError(null);
     try {
+      // Same dequeue the door console does. Leaving a pending scan in
+      // IndexedDB means the next syncCheckIns on this device writes them
+      // back to checked_in and undoes the revert.
+      await removeFromQueue([`${eventId}:${person.id}`]);
+      await markRosterEntryNotCheckedIn(eventId, person.id);
       await undoCheckIn({ eventId, registrationId: person.id });
       await onChanged();
     } catch (err) {

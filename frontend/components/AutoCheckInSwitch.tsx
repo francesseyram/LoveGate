@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getCallableErrorMessage, getEventSettings, setEventAutoCheckIn } from "@/lib/functions";
 
 /**
@@ -49,8 +49,6 @@ export function AutoCheckInSwitch({
   const [loaded, setLoaded] = useState<Settings | null>(null);
   const [savingFor, setSavingFor] = useState<string | null>(null);
   const [failure, setFailure] = useState<{ eventId: string; message: string } | null>(null);
-  const eventIdRef = useRef(eventId);
-  eventIdRef.current = eventId;
 
   const settings = loaded?.eventId === eventId ? loaded : null;
   const saving = savingFor === eventId;
@@ -89,11 +87,9 @@ export function AutoCheckInSwitch({
     setFailure(null);
     try {
       const fresh = await setEventAutoCheckIn({ eventId: requestedId, enabled: next });
-      if (eventIdRef.current !== requestedId) return;
       setLoaded({ eventId: requestedId, autoCheckIn: fresh.autoCheckIn, since: fresh.autoCheckInSince });
       await onChanged?.();
     } catch (err) {
-      if (eventIdRef.current !== requestedId) return;
       setLoaded(previous);
       setFailure({ eventId: requestedId, message: getCallableErrorMessage(err) });
     } finally {

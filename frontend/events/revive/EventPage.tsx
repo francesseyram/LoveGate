@@ -107,8 +107,8 @@ export default function ReviveEventPage() {
           </div>
 
           <div className="mb-12 flex flex-col gap-4 sm:mb-14">
-            <div className="flex items-center gap-3.5">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <div className="flex items-start gap-3.5">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mt-1 shrink-0">
                 <rect x="3" y="5" width="18" height="16" rx="2" stroke="#D9A441" strokeWidth="1.6" />
                 <path
                   d="M3 9H21M8 3V6M16 3V6"
@@ -122,13 +122,13 @@ export default function ReviveEventPage() {
               </div>
             </div>
             {event.location && (
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-start gap-3.5">
                 <svg
                   width="20"
                   height="20"
                   viewBox="0 0 24 24"
                   fill="none"
-                  className="shrink-0"
+                  className="mt-1 shrink-0"
                   aria-hidden="true"
                 >
                   <path

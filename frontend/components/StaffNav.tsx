@@ -66,7 +66,7 @@ export function StaffNav({
         <Link
           href="/"
           title="Back to the public site"
-          className="flex shrink-0 items-center gap-2 rounded-lg text-cream transition hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
+          className="-ml-1 flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-1 text-cream transition hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
         >
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-coral text-cream">
             <GateMark className="h-4 w-4" />
