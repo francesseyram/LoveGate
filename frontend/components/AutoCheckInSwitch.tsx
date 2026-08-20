@@ -38,6 +38,25 @@ interface Settings {
   since: string | null;
 }
 
+/**
+ * Applies a settings write only while the slot still holds the event it was
+ * made for.
+ *
+ * `loaded` is one slot shared by every event, so a save for the event you just
+ * navigated away from must not land on top of the one now on screen. Tagging
+ * the value is not enough by itself: the tag stops a stale value being *read*,
+ * but a stale write still overwrites the fresh one, and the effect that
+ * fetched it will not run again — leaving the switch stuck disabled and
+ * reading "off" while late-arrival mode is in fact still on, quietly checking
+ * in every walk-up registration.
+ *
+ * Written as a functional update rather than a ref so the check happens against
+ * whatever React actually holds at commit time.
+ */
+function keepIfStillOn(eventId: string, value: Settings | null) {
+  return (current: Settings | null) => (current?.eventId === eventId ? value : current);
+}
+
 export function AutoCheckInSwitch({
   eventId,
   /** Lets the page it sits on re-pull its numbers — the room count moves the moment this is on. */
@@ -82,16 +101,24 @@ export function AutoCheckInSwitch({
 
     // Move the switch first: it is the one control on this page whose position
     // *is* the state, so it should never lag behind the tap that moved it.
-    setLoaded({ eventId: requestedId, autoCheckIn: next, since: next ? new Date().toISOString() : null });
+    setLoaded({
+      eventId: requestedId,
+      autoCheckIn: next,
+      since: next ? new Date().toISOString() : null,
+    });
     setSavingFor(requestedId);
     setFailure(null);
     try {
       const fresh = await setEventAutoCheckIn({ eventId: requestedId, enabled: next });
-      setLoaded({ eventId: requestedId, autoCheckIn: fresh.autoCheckIn, since: fresh.autoCheckInSince });
+      setLoaded(keepIfStillOn(requestedId, { eventId: requestedId, autoCheckIn: fresh.autoCheckIn, since: fresh.autoCheckInSince }));
       await onChanged?.();
     } catch (err) {
-      setLoaded(previous);
-      setFailure({ eventId: requestedId, message: getCallableErrorMessage(err) });
+      setLoaded(keepIfStillOn(requestedId, previous));
+      setFailure((current) =>
+        current && current.eventId !== requestedId
+          ? current
+          : { eventId: requestedId, message: getCallableErrorMessage(err) }
+      );
     } finally {
       setSavingFor((current) => (current === requestedId ? null : current));
     }

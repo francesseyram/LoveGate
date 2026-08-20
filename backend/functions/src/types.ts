@@ -62,6 +62,16 @@ export interface RegistrationDoc {
    * nobody did and late-arrival mode checked them in at registration.
    */
   checkedInBy: string | null;
+  /**
+   * When a staff member last reverted this person's check-in.
+   *
+   * Exists so a queued offline scan cannot resurrect a revert. Devices flush
+   * their queue whenever they reconnect, and a scan recorded before the revert
+   * can reach the server after it — from another phone entirely, which no
+   * amount of client-side coordination can prevent. `syncCheckIns` compares
+   * against this and drops anything the revert already answered for.
+   */
+  revertedAt?: Timestamp | null;
   /** Set only after a confirmed reminder send — the per-person idempotency key. */
   remindedAt?: Timestamp | null;
 }

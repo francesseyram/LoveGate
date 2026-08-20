@@ -19,10 +19,9 @@ import {
   getCallableErrorMessage,
   getEventDashboard,
   getPublishedEvents,
-  undoCheckIn,
 } from "@/lib/functions";
+import { revertCheckIn } from "@/lib/revertCheckIn";
 import type { Dashboard, DashboardAttendee, EventSummary } from "@/lib/types";
-import { markRosterEntryNotCheckedIn, removeFromQueue } from "@/lib/offlineStore";
 
 /**
  * The dashboard.
@@ -267,12 +266,9 @@ function AttendeeTable({
     setUndoingId(person.id);
     setError(null);
     try {
-      // Same dequeue the door console does. Leaving a pending scan in
-      // IndexedDB means the next syncCheckIns on this device writes them
-      // back to checked_in and undoes the revert.
-      await removeFromQueue([`${eventId}:${person.id}`]);
-      await markRosterEntryNotCheckedIn(eventId, person.id);
-      await undoCheckIn({ eventId, registrationId: person.id });
+      // Shared with the door console: dropping the queued scan is only half of
+      // it, and this page has no hook to wait out a flush already in progress.
+      await revertCheckIn({ eventId, registrationId: person.id });
       await onChanged();
     } catch (err) {
       setError(`Could not undo ${person.name}'s check-in. ${getCallableErrorMessage(err)}`);

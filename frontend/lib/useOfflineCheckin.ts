@@ -1,12 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import {
-  getEventRoster,
-  syncCheckIns,
-  undoCheckIn as undoCheckInCall,
-  getCallableErrorMessage,
-} from "./functions";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { getEventRoster, syncCheckIns, getCallableErrorMessage } from "./functions";
+import { revertCheckIn } from "./revertCheckIn";
 import {
   saveRoster,
   loadRoster,
@@ -14,7 +10,7 @@ import {
   getQueue,
   removeFromQueue,
   markRosterEntryCheckedIn,
-  markRosterEntryNotCheckedIn,
+  trackQueueFlush,
   type CachedRoster,
   type RosterEntry,
 } from "./offlineStore";
@@ -56,45 +52,43 @@ export function useOfflineCheckin(eventId: string) {
     setPendingCount((await getQueue(eventId)).length);
   }, [eventId]);
 
-  // sync() copies the queue, then awaits the server. An undo that only deletes
-  // the IndexedDB row cannot cancel that copy — so undo waits these out before
-  // telling the server to revert, otherwise a scan that was already in flight
-  // lands after the desk has shown "not arrived".
-  const inflightSyncs = useRef(new Set<Promise<void>>());
-
-  /** Flushes anything recorded while offline. Safe to call repeatedly. */
+  /**
+   * Flushes anything recorded while offline. Safe to call repeatedly.
+   *
+   * Registered with `trackQueueFlush` so a revert — from this page or from the
+   * dashboard — can wait for it. Once this has read the queue it is committed
+   * to sending it, and deleting the IndexedDB row underneath cannot stop that.
+   */
   const sync = useCallback(async () => {
     if (!eventId || !navigator.onLine) return;
 
-    let settle!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      settle = resolve;
+    await trackQueueFlush(async () => {
+      try {
+        const queue = await getQueue(eventId);
+        if (queue.length === 0) return;
+
+        const result = await syncCheckIns({
+          eventId,
+          checkIns: queue.map((q) => ({
+            registrationId: q.registrationId,
+            checkedInAt: q.checkedInAt,
+          })),
+        });
+        // Drop anything the server has now accounted for — including rows it
+        // says were already checked in or has since reverted, otherwise they'd
+        // retry forever.
+        const settled = new Set([
+          ...result.applied,
+          ...result.alreadyCheckedIn,
+          ...result.notFound,
+          ...(result.reverted ?? []),
+        ]);
+        await removeFromQueue(queue.filter((q) => settled.has(q.registrationId)).map((q) => q.key));
+        await refreshPendingCount();
+      } catch (err) {
+        setError(getCallableErrorMessage(err));
+      }
     });
-    inflightSyncs.current.add(gate);
-
-    try {
-      const queue = await getQueue(eventId);
-      if (queue.length === 0) return;
-
-      const result = await syncCheckIns({
-        eventId,
-        checkIns: queue.map((q) => ({ registrationId: q.registrationId, checkedInAt: q.checkedInAt })),
-      });
-      // Drop anything the server has now accounted for — including rows it
-      // says were already checked in, otherwise they'd retry forever.
-      const settled = new Set([
-        ...result.applied,
-        ...result.alreadyCheckedIn,
-        ...result.notFound,
-      ]);
-      await removeFromQueue(queue.filter((q) => settled.has(q.registrationId)).map((q) => q.key));
-      await refreshPendingCount();
-    } catch (err) {
-      setError(getCallableErrorMessage(err));
-    } finally {
-      inflightSyncs.current.delete(gate);
-      settle();
-    }
   }, [eventId, refreshPendingCount]);
 
   /** Pulls the attendee list down for offline use. */
@@ -211,14 +205,8 @@ export function useOfflineCheckin(eventId: string) {
    *
    * Unlike checkIn this waits on the server and refuses to run offline. A
    * check-in can be replayed later because it is additive; an undo cannot,
-   * because the queue it would have to fight with is a queue of check-ins —
-   * revert locally while a scan for the same person is still pending and the
-   * next sync silently re-checks them in.
-   *
-   * Dropping the pending scan first is what makes a *future* sync safe. An
-   * in-flight sync has already copied the queue, so we also wait those out
-   * before asking the server to revert — otherwise it can apply the check-in
-   * after this function has already shown "not arrived".
+   * because the queue it would have to fight with is a queue of check-ins.
+   * `revertCheckIn` owns the ordering that makes it safe.
    */
   const undo = useCallback(
     async (entry: RosterEntry): Promise<UndoOutcome> => {
@@ -233,17 +221,16 @@ export function useOfflineCheckin(eventId: string) {
         };
       }
 
-      await removeFromQueue([`${eventId}:${entry.id}`]);
-      await refreshPendingCount();
-      await Promise.all([...inflightSyncs.current]);
-
       try {
-        await undoCheckInCall({ eventId, registrationId: entry.id });
+        await revertCheckIn({ eventId, registrationId: entry.id });
       } catch (err) {
+        // The queue row is already gone either way, so the badge has to be
+        // re-read whether this succeeded or not.
+        await refreshPendingCount();
         return { result: "failed", name: entry.name, message: getCallableErrorMessage(err) };
       }
 
-      await markRosterEntryNotCheckedIn(eventId, entry.id);
+      await refreshPendingCount();
       setRoster((prev) =>
         prev
           ? {

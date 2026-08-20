@@ -24,7 +24,15 @@ async function markCheckedIn(
   }
 
   const checkedInAt = Timestamp.now();
-  await docRef.update({ status: "checked_in", checkedInAt, checkedInBy: staffUid });
+  // Clearing revertedAt matters: this is a live scan, so it necessarily happened
+  // after any earlier revert, and leaving the marker would have syncCheckIns
+  // discard this person's next queued scan.
+  await docRef.update({
+    status: "checked_in",
+    checkedInAt,
+    checkedInBy: staffUid,
+    revertedAt: null,
+  });
 
   return {
     outcome: "checked_in" as const,
@@ -119,16 +127,25 @@ export const undoCheckIn = onCall<UndoCheckInInput>(async (request) => {
     throw new HttpsError("not-found", "This registration is not for the selected event");
   }
 
+  const revertedAt = Timestamp.now();
+
   // Not an error. Two staff phones can undo the same row, and a queued offline
   // check-in can land after an undo — both should settle, not throw.
+  //
+  // The marker is written even here, where the row already reads "going". The
+  // server may simply not have heard the scan yet: it can still be sitting in
+  // a queue on a phone that has been offline since the door opened. Returning
+  // without stamping would leave that scan free to land later and undo the
+  // undo, which is the exact case this marker exists for.
   if (registration.status !== "checked_in") {
+    await docRef.update({ revertedAt });
     return {
       outcome: "not_checked_in" as const,
       registration: registrationToSummary(docRef.id, registration),
     };
   }
 
-  await docRef.update({ status: "going", checkedInAt: null, checkedInBy: null });
+  await docRef.update({ status: "going", checkedInAt: null, checkedInBy: null, revertedAt });
 
   logger.info("Reverted check-in", {
     eventId,

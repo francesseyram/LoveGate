@@ -2,6 +2,7 @@ import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https
 import { Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { db } from "./admin";
+import { isSupersededByRevert } from "./revertGuard";
 import { RegistrationDoc, RegistrationSummaryDTO, registrationToSummary } from "./types";
 
 function requireStaff(request: CallableRequest<unknown>): string {
@@ -93,6 +94,7 @@ export const syncCheckIns = onCall<{ eventId: string; checkIns: QueuedCheckIn[] 
     const applied: string[] = [];
     const alreadyCheckedIn: string[] = [];
     const notFound: string[] = [];
+    const reverted: string[] = [];
 
     for (const entry of checkIns) {
       const docRef = db.collection("registrations").doc(entry.registrationId);
@@ -116,7 +118,21 @@ export const syncCheckIns = onCall<{ eventId: string; checkIns: QueuedCheckIn[] 
         ? Timestamp.fromDate(new Date(entry.checkedInAt))
         : Timestamp.now();
 
-      await docRef.update({ status: "checked_in", checkedInAt, checkedInBy: staffUid });
+      // A staff member has since undone a check-in for this person. Anything
+      // scanned before that decision is what they were undoing, so honour it
+      // rather than writing them back into the room. A genuine re-scan carries
+      // a later timestamp and still applies.
+      if (isSupersededByRevert(checkedInAt, registration.revertedAt)) {
+        reverted.push(entry.registrationId);
+        continue;
+      }
+
+      await docRef.update({
+        status: "checked_in",
+        checkedInAt,
+        checkedInBy: staffUid,
+        revertedAt: null,
+      });
       applied.push(entry.registrationId);
     }
 
@@ -125,8 +141,9 @@ export const syncCheckIns = onCall<{ eventId: string; checkIns: QueuedCheckIn[] 
       applied: applied.length,
       alreadyCheckedIn: alreadyCheckedIn.length,
       notFound: notFound.length,
+      reverted: reverted.length,
     });
 
-    return { applied, alreadyCheckedIn, notFound };
+    return { applied, alreadyCheckedIn, notFound, reverted };
   }
 );

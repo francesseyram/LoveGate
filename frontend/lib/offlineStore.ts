@@ -61,6 +61,38 @@ function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObjectStore)
   );
 }
 
+/**
+ * Queue flushes that have started but not finished.
+ *
+ * `syncCheckIns` reads the queue into memory before it awaits the server, so
+ * deleting a row from IndexedDB cannot recall a flush already in progress.
+ * Anything that needs the queue to be settled — reverting a check-in — waits
+ * these out first.
+ *
+ * Module scope because the queue is per-origin: the dashboard and the check-in
+ * console are separate pages that share one IndexedDB, and a revert triggered
+ * from one has to account for a flush started by the other. It cannot see
+ * another *tab* or another device, which is why the server also stamps
+ * `revertedAt` — see backend/functions/src/roster.ts.
+ */
+const inflightFlushes = new Set<Promise<void>>();
+
+export function trackQueueFlush<T>(run: () => Promise<T>): Promise<T> {
+  const work = run();
+  // Never rejects, so one failed flush can't reject an unrelated waiter.
+  const gate = work.then(
+    () => {},
+    () => {}
+  );
+  inflightFlushes.add(gate);
+  void gate.then(() => inflightFlushes.delete(gate));
+  return work;
+}
+
+export async function settleQueueFlushes(): Promise<void> {
+  await Promise.all([...inflightFlushes]);
+}
+
 export async function saveRoster(roster: CachedRoster): Promise<void> {
   await tx(ROSTER_STORE, "readwrite", (s) => s.put(roster));
 }

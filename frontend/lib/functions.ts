@@ -11,9 +11,29 @@ import type {
 } from "./types";
 import type { RosterEntry } from "./offlineStore";
 
+/**
+ * Codes whose own message is a bare machine string, mapped to something a
+ * volunteer holding a phone can act on.
+ *
+ * Everything else keeps the server's wording on purpose — `registerForEvent`
+ * and the check-in handlers write real sentences for the person reading them
+ * ("a valid phone number is required"), and those must survive untouched.
+ *
+ * `internal` is here because a callable that has not been deployed 404s, and
+ * the SDK reports that as `internal` with the message "internal" — identical
+ * to a genuine crash and useless to whoever is standing at the door.
+ */
+const OPAQUE_ERRORS: Record<string, string> = {
+  "functions/internal": "The server couldn't handle that. It may need updating — tell a lead.",
+  "functions/not-found": "The server couldn't handle that. It may need updating — tell a lead.",
+  "functions/unavailable": "Can't reach the server. Check your connection and try again.",
+  "functions/deadline-exceeded": "The server took too long to answer. Try again.",
+  "functions/cancelled": "That request stopped before it finished. Try again.",
+};
+
 export function getCallableErrorMessage(err: unknown): string {
   if (err instanceof FunctionsError) {
-    return err.message;
+    return OPAQUE_ERRORS[err.code] ?? err.message;
   }
   return "Something went wrong. Please try again.";
 }
@@ -124,10 +144,17 @@ export async function getEventStats(input: {
 export async function syncCheckIns(input: {
   eventId: string;
   checkIns: Array<{ registrationId: string; checkedInAt: string }>;
-}): Promise<{ applied: string[]; alreadyCheckedIn: string[]; notFound: string[] }> {
+}): Promise<{
+  applied: string[];
+  alreadyCheckedIn: string[];
+  notFound: string[];
+  /** Dropped because a staff member had already reverted that check-in. Absent
+   *  from a backend deployed before the revert guard existed. */
+  reverted?: string[];
+}> {
   const call = httpsCallable<
     typeof input,
-    { applied: string[]; alreadyCheckedIn: string[]; notFound: string[] }
+    { applied: string[]; alreadyCheckedIn: string[]; notFound: string[]; reverted?: string[] }
   >(functions, "syncCheckIns");
   const { data } = await call(input);
   return data;
