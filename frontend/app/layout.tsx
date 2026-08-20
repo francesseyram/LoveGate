@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Sora, Work_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -38,6 +38,25 @@ export const metadata: Metadata = {
       "Free tickets to Love Inc gatherings. Register in about a minute and show the QR code at the door.",
   },
   twitter: { card: "summary_large_image" },
+};
+
+/**
+ * `viewportFit: "cover"` lets the dark event and staff surfaces run under a
+ * notch and the home indicator instead of being letterboxed by white bars;
+ * every layout that reaches an edge pays for it back with a safe-area inset.
+ *
+ * Zoom is deliberately left enabled. Locking it would be one line, and it
+ * would take pinch-to-zoom away from anyone who needs to enlarge a ticket
+ * reference or a name at the door.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAF7F2" },
+    { media: "(prefers-color-scheme: dark)", color: "#120807" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -148,13 +148,13 @@ export function AutoCheckInSwitch({
           aria-label="Check people in as they register"
           onClick={() => void toggle()}
           disabled={!eventId || !ready || saving}
-          className={`relative h-9 w-16 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold disabled:opacity-40 ${
+          className={`relative h-10 w-[68px] shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold disabled:opacity-40 ${
             enabled ? "border-sage/50 bg-sage/35" : "border-cream/15 bg-cream/[0.08]"
           }`}
         >
           <span
-            className={`absolute top-1/2 h-7 w-7 -translate-y-1/2 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.45)] transition-[left,background-color] duration-200 ${
-              enabled ? "left-[calc(100%-2rem)] bg-sage" : "left-1 bg-cream/55"
+            className={`absolute top-1/2 h-8 w-8 -translate-y-1/2 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.45)] transition-[left,background-color] duration-200 ${
+              enabled ? "left-[calc(100%-2.25rem)] bg-sage" : "left-1 bg-cream/55"
             }`}
           />
         </button>

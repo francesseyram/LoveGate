@@ -183,6 +183,47 @@ const DARK = "#120807";
 const CANVAS = "#FAF7F2";
 
 /**
+ * The one block of rules in this email that does not live on the element.
+ *
+ * Inline styles are the baseline every client understands, but they cannot be
+ * conditional — and this mail is opened on a phone far more often than on a
+ * desktop, so the phone layout has to come from a media query. Every rule here
+ * needs `!important` to outrank the inline value it corrects.
+ *
+ * Outlook on Windows drops this block entirely and keeps the desktop values,
+ * which is the right outcome: it is the one client that is never a phone.
+ */
+const MOBILE_STYLES = `
+      body { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+      table { border-collapse:collapse; }
+      img { border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
+
+      @media only screen and (max-width:600px) {
+        /* Edge to edge. The old 12px frame plus 28px gutters left a 256px
+           column on a 320px screen — narrower than the ticket inside it. */
+        .frame { padding:0 !important; }
+        .shell { width:100% !important; border-radius:0 !important; border-left:0 !important; border-right:0 !important; }
+        .gutter { padding-left:18px !important; padding-right:18px !important; }
+        .h1 { font-size:26px !important; line-height:1.14 !important; letter-spacing:-0.4px !important; }
+        /* The wordmark identifies the sender on its own in a narrow header. */
+        .meta { display:none !important; }
+        /* The reason the email exists, so it takes the width that frees up. */
+        .qr { width:224px !important; height:224px !important; }
+        .qrpad { padding:24px 12px !important; }
+        /* A full-width bar is a thumb target; an inline pill is not. */
+        .cta { display:block !important; }
+        .maplink { display:inline-block !important; padding:12px 0 !important; }
+      }`;
+
+/**
+ * Padding for the card's own gutters. Every td carrying it gets `class="gutter"`
+ * so one media-query rule can narrow all of them at once.
+ */
+function gutter(vertical: string): string {
+  return `padding:${vertical} 28px;`;
+}
+
+/**
  * Table-based, inline-styled shell. Email clients (Outlook especially) do not
  * support flexbox, grid, or external stylesheets, so structure has to be
  * tables and every rule has to live on the element.
@@ -202,25 +243,30 @@ function shell(params: {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
     <title>${escapeHtml(heading)}</title>
+    <style>${MOBILE_STYLES}
+    </style>
   </head>
-  <body style="margin:0;padding:0;background:${CANVAS};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-    <!-- Inbox preview line; hidden in the body itself. -->
+  <body style="margin:0;padding:0;width:100%;background:${CANVAS};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <!-- Inbox preview line, then padding so the client stops before it reaches
+         the body copy and repeats it back in the list view. -->
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${"&#847;&zwnj;&nbsp;".repeat(40)}</div>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CANVAS};">
       <tr>
-        <td align="center" style="padding:24px 12px;">
-          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #E9E2D7;">
+        <td align="center" class="frame" style="padding:24px 12px;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="shell" style="width:600px;max-width:100%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #E9E2D7;">
 
             <tr>
-              <td style="background:${DARK};padding:22px 28px;">
+              <td class="gutter" style="background:${DARK};${gutter("20px")}">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="font-size:19px;font-weight:800;letter-spacing:-0.4px;color:${CREAM};">
                       Love<span style="color:${CORAL};">Gate</span>
                     </td>
-                    <td align="right" style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(251,243,231,0.5);">
+                    <td align="right" class="meta" style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(251,243,231,0.5);">
                       Love Inc Global
                     </td>
                   </tr>
@@ -229,11 +275,11 @@ function shell(params: {
             </tr>
 
             <tr>
-              <td style="padding:32px 28px 0 28px;">
+              <td class="gutter" style="${gutter("30px")}padding-bottom:0;">
                 <div style="font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${eyebrowColor};">
                   ${escapeHtml(eyebrow)}
                 </div>
-                <h1 style="margin:10px 0 0 0;font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-1px;color:${INK};">
+                <h1 class="h1" style="margin:10px 0 0 0;font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-1px;color:${INK};">
                   ${escapeHtml(heading)}
                 </h1>
               </td>
@@ -242,18 +288,18 @@ function shell(params: {
             ${body}
 
             <tr>
-              <td style="padding:8px 28px 30px 28px;">
-                <p style="margin:0;font-size:12.5px;line-height:1.6;color:rgba(25,21,18,0.45);">
+              <td class="gutter" style="${gutter("8px")}padding-top:22px;padding-bottom:28px;">
+                <p style="margin:0;font-size:13px;line-height:1.65;color:rgba(25,21,18,0.45);">
                   ${footerNote}
                 </p>
               </td>
             </tr>
 
             <tr>
-              <td style="background:${CANVAS};border-top:1px solid #E9E2D7;padding:18px 28px;">
-                <p style="margin:0;font-size:12px;line-height:1.6;color:rgba(25,21,18,0.45);">
-                  Love Inc Global · University of Ghana, Legon<br />
-                  You're receiving this because you registered for an event with LoveGate.
+              <td class="gutter" style="background:${CANVAS};border-top:1px solid #E9E2D7;${gutter("18px")}">
+                <p style="margin:0;font-size:12.5px;line-height:1.65;color:rgba(25,21,18,0.45);">
+                  Love Inc Global &middot; University of Ghana, Legon<br />
+                  You&rsquo;re receiving this because you registered for an event with LoveGate.
                 </p>
               </td>
             </tr>
@@ -271,7 +317,7 @@ function flyerBlock(hasFlyer: boolean, event: EventDoc): string {
   if (!hasFlyer) return "";
   return `
             <tr>
-              <td style="padding:26px 28px 0 28px;">
+              <td class="gutter" style="${gutter("24px")}padding-bottom:0;">
                 <img src="cid:event-flyer" alt="${escapeHtml(event.name)}" width="544"
                      style="display:block;width:100%;max-width:544px;height:auto;border-radius:12px;border:1px solid #E9E2D7;" />
               </td>
@@ -284,28 +330,30 @@ function detailsBlock(event: EventDoc): string {
   const venue = event.location
     ? `
                   <tr>
-                    <td style="padding:14px 0 0 0;">
+                    <td style="padding:16px 18px 0 18px;">
                       <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(25,21,18,0.4);">Where</div>
-                      <div style="margin-top:4px;font-size:16px;font-weight:600;color:${INK};">${escapeHtml(event.location)}</div>
+                      <div style="margin-top:5px;font-size:16px;font-weight:600;line-height:1.4;color:${INK};">${escapeHtml(event.location)}</div>
                       ${
                         event.locationUrl
-                          ? `<a href="${escapeHtml(event.locationUrl)}" style="font-size:14px;color:${CORAL};text-decoration:underline;">Open in Maps</a>`
+                          ? `<a href="${escapeHtml(event.locationUrl)}" class="maplink" style="display:inline-block;padding:8px 0;font-size:14.5px;font-weight:600;color:${CORAL};text-decoration:underline;">Open in Maps &rarr;</a>`
                           : ""
                       }
                     </td>
                   </tr>`
     : "";
 
+  // Padding sits on the inner cells, not on the <table>: Outlook ignores
+  // padding on a table element and the panel collapses onto its own text.
   return `
             <tr>
-              <td style="padding:22px 28px 0 28px;">
+              <td class="gutter" style="${gutter("20px")}padding-bottom:0;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                       style="background:${CANVAS};border:1px solid #E9E2D7;border-radius:12px;padding:18px;">
+                       style="background:${CANVAS};border:1px solid #E9E2D7;border-radius:12px;">
                   <tr>
-                    <td>
+                    <td style="padding:18px 18px 18px 18px;">
                       <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(25,21,18,0.4);">When</div>
-                      <div style="margin-top:4px;font-size:16px;font-weight:600;color:${INK};">${escapeHtml(formatDatePart(startsAt))}</div>
-                      <div style="font-size:15px;color:rgba(25,21,18,0.6);">${escapeHtml(formatTimePart(startsAt))}</div>
+                      <div style="margin-top:5px;font-size:16px;font-weight:600;line-height:1.4;color:${INK};">${escapeHtml(formatDatePart(startsAt))}</div>
+                      <div style="margin-top:2px;font-size:15px;color:rgba(25,21,18,0.6);">${escapeHtml(formatTimePart(startsAt))}</div>
                     </td>
                   </tr>${venue}
                 </table>
@@ -313,27 +361,37 @@ function detailsBlock(event: EventDoc): string {
             </tr>`;
 }
 
-/** The QR, on its own high-contrast panel so it scans off a screen. */
+/**
+ * The QR, on its own high-contrast panel so it scans off a screen.
+ *
+ * The brightness line is not filler. This ticket gets held up in a dim hall to
+ * a volunteer with a phone camera, and a QR on a screen dimmed for a dark room
+ * is the way a scan actually fails — so the ticket says so, at the moment
+ * someone is looking straight at it.
+ */
 function ticketBlock(params: { ticketRef?: string; caption: string }): string {
   const { ticketRef, caption } = params;
   return `
             <tr>
-              <td style="padding:22px 28px 0 28px;">
+              <td class="gutter" style="${gutter("20px")}padding-bottom:0;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                        style="background:${DARK};border-radius:12px;">
                   <tr>
-                    <td align="center" style="padding:26px 20px;">
+                    <td align="center" class="qrpad" style="padding:26px 20px;">
                       <div style="font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:${GOLD};">
                         Admit one
                       </div>
-                      <img src="cid:ticket-qr" alt="Your ticket QR code" width="200" height="200"
-                           style="display:block;margin:14px auto 0 auto;width:200px;height:200px;background:#ffffff;padding:12px;border-radius:10px;" />
+                      <img src="cid:ticket-qr" alt="Your ticket QR code" width="200" height="200" class="qr"
+                           style="display:block;margin:14px auto 0 auto;width:200px;height:200px;background:#ffffff;padding:14px;border-radius:10px;" />
                       ${
                         ticketRef
-                          ? `<div style="margin-top:14px;font-size:15px;font-weight:700;letter-spacing:2.5px;color:${CREAM};">${escapeHtml(ticketRef)}</div>`
+                          ? `<div style="margin-top:16px;font-size:16px;font-weight:700;letter-spacing:2.5px;color:${CREAM};">${escapeHtml(ticketRef)}</div>`
                           : ""
                       }
-                      <div style="margin-top:6px;font-size:12px;color:rgba(251,243,231,0.5);">${escapeHtml(caption)}</div>
+                      <div style="margin-top:6px;font-size:12.5px;color:rgba(251,243,231,0.55);">${escapeHtml(caption)}</div>
+                      <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(251,243,231,0.14);font-size:12.5px;line-height:1.5;color:rgba(251,243,231,0.45);">
+                        Turn your screen brightness up before you reach the door.
+                      </div>
                     </td>
                   </tr>
                 </table>
@@ -347,9 +405,9 @@ function ticketLinkBlock(event: EventDoc): string {
   const url = `${site}/events/${encodeURIComponent(event.slug)}`;
   return `
             <tr>
-              <td align="center" style="padding:20px 28px 0 28px;">
-                <a href="${escapeHtml(url)}"
-                   style="display:inline-block;background:${CORAL};color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:13px 26px;border-radius:999px;">
+              <td align="center" class="gutter" style="${gutter("20px")}padding-bottom:0;">
+                <a href="${escapeHtml(url)}" class="cta"
+                   style="display:inline-block;background:${CORAL};color:#ffffff;font-size:15.5px;font-weight:700;text-decoration:none;padding:15px 26px;border-radius:999px;text-align:center;">
                   View the event page
                 </a>
               </td>
@@ -359,7 +417,7 @@ function ticketLinkBlock(event: EventDoc): string {
 function paragraph(html: string): string {
   return `
             <tr>
-              <td style="padding:16px 28px 0 28px;">
+              <td class="gutter" style="${gutter("16px")}padding-bottom:0;">
                 <p style="margin:0;font-size:16px;line-height:1.65;color:rgba(25,21,18,0.7);">${html}</p>
               </td>
             </tr>`;
@@ -410,6 +468,7 @@ export async function sendConfirmationEmail(params: {
       ticketRef ? `Ticket: ${ticketRef}` : null,
       ``,
       `Your QR ticket is attached. Show it at the door and you're in.`,
+      `Turn your screen brightness up before you reach the door so it scans first time.`,
       `Entry is free, and the ticket is just for you. If you're bringing someone,`,
       `send them the link so they can get their own.`,
       ``,
@@ -466,13 +525,15 @@ export async function sendReminderEmail(params: {
     attachments.push({ filename: flyerFilename(event), content: flyer, contentId: "event-flyer" });
   }
 
-  // Small and to one side — the reminder is about logistics, not the poster.
+  // Demoted to a small centred poster — the reminder is about logistics, not
+  // the artwork. Sized rather than cropped: `object-fit` is unsupported in
+  // Gmail and Outlook, so the old fixed height just squashed the flyer.
   const flyerStrip = flyer
     ? `
             <tr>
-              <td style="padding:22px 28px 0 28px;">
-                <img src="cid:event-flyer" alt="${escapeHtml(event.name)}" width="544"
-                     style="display:block;width:100%;max-width:544px;height:150px;object-fit:cover;border-radius:12px;border:1px solid #E9E2D7;" />
+              <td align="center" class="gutter" style="${gutter("22px")}padding-bottom:0;">
+                <img src="cid:event-flyer" alt="${escapeHtml(event.name)}" width="180"
+                     style="display:block;width:180px;max-width:60%;height:auto;border-radius:10px;border:1px solid #E9E2D7;" />
               </td>
             </tr>`
     : "";
@@ -491,7 +552,8 @@ export async function sendReminderEmail(params: {
       `When: ${formatEventDate(startsAt)}${venuePlain(event)}`,
       ticketRef ? `Ticket: ${ticketRef}` : null,
       ``,
-      `Your QR ticket is attached. Have it ready at the door.`,
+      `Your QR ticket is attached. Have it ready at the door, with your screen`,
+      `brightness turned up so it scans first time.`,
     ]),
     html: shell({
       preheader: tomorrow

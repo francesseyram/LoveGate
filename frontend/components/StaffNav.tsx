@@ -61,8 +61,8 @@ export function StaffNav({
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-cream/10 bg-[#0D0705]/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-5 gap-y-3 px-5 py-3 sm:px-8">
+    <header className="sticky top-0 z-30 border-b border-cream/10 bg-[#0D0705]/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-2.5 sm:gap-x-5 sm:px-8 sm:py-3">
         <Link
           href="/"
           title="Back to the public site"
@@ -88,7 +88,7 @@ export function StaffNav({
                   key={tab.href}
                   href={tab.href}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-lg px-3.5 py-1.5 font-[family-name:var(--font-oswald)] text-[12px] tracking-[0.1em] whitespace-nowrap uppercase transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
+                  className={`flex min-h-10 items-center rounded-lg px-4 font-[family-name:var(--font-oswald)] text-[12.5px] tracking-[0.1em] whitespace-nowrap uppercase transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
                     active
                       ? "bg-gold/15 text-gold shadow-[inset_0_0_0_1px_rgba(217,164,65,0.28)]"
                       : "text-cream/45 hover:bg-cream/[0.05] hover:text-cream"
@@ -109,7 +109,7 @@ export function StaffNav({
               value={eventId}
               onChange={(event) => onEventChange(event.target.value)}
               aria-label="Event"
-              className="max-w-[46vw] truncate rounded-lg border border-gold/35 bg-cream/[0.06] px-3 py-1.5 font-sans text-[14px] text-cream outline-none focus:border-gold sm:max-w-none"
+              className="h-10 max-w-[46vw] truncate rounded-lg border border-gold/35 bg-cream/[0.06] px-3 font-sans text-[16px] text-cream outline-none focus:border-gold sm:max-w-none"
             >
               {events.map((event) => (
                 <option key={event.id} value={event.id} className="bg-[#22090a] text-cream">
@@ -121,7 +121,7 @@ export function StaffNav({
 
           <button
             onClick={handleSignOut}
-            className="rounded font-[family-name:var(--font-oswald)] text-[11px] tracking-[0.12em] whitespace-nowrap text-cream/40 uppercase transition hover:text-coral focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
+            className="-mr-2 flex min-h-10 items-center rounded px-2 font-[family-name:var(--font-oswald)] text-[11px] tracking-[0.12em] whitespace-nowrap text-cream/40 uppercase transition hover:text-coral focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
           >
             Sign out
           </button>

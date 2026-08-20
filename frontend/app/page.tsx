@@ -394,7 +394,7 @@ function Hero({ event }: { event: EventSummary }) {
                       href={event.locationUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded text-[14px] text-gold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                      className="-my-1 inline-flex min-h-11 items-center rounded text-[14.5px] font-semibold text-gold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                     >
                       Open in Maps
                     </a>
@@ -657,13 +657,13 @@ export default function HomePage() {
 
   return (
     <div
-      className={`${jakarta.variable} min-h-screen bg-canvas font-[family-name:var(--font-plus-jakarta)] text-ink`}
+      className={`${jakarta.variable} min-h-[100svh] bg-canvas font-[family-name:var(--font-plus-jakarta)] text-ink`}
     >
       <header className="absolute inset-x-0 top-0 z-30">
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between px-5 py-4 sm:px-8 sm:py-5">
+        <div className="mx-auto flex max-w-[1240px] items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-4 sm:px-8 sm:pt-5 sm:pb-5">
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-lg text-cream focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
+            className="-ml-1 flex min-h-11 items-center gap-2.5 rounded-lg px-1 text-cream focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral text-cream">
               <GateMark className="h-5 w-5" />
@@ -674,7 +674,7 @@ export default function HomePage() {
           </Link>
           <Link
             href="/login"
-            className="rounded-full px-3.5 py-2 text-[13.5px] font-semibold text-cream/60 transition hover:bg-white/10 hover:text-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:px-4"
+            className="flex min-h-11 items-center rounded-full px-3.5 text-[14px] font-semibold text-cream/60 transition hover:bg-white/10 hover:text-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold sm:px-4"
           >
             Staff sign-in
           </Link>
@@ -716,7 +716,7 @@ export default function HomePage() {
       </main>
 
       <footer className="bg-[#120807] text-cream">
-        <div className="mx-auto flex max-w-[1240px] flex-col gap-8 px-5 py-12 sm:px-8 sm:py-14 md:flex-row md:items-start md:justify-between">
+        <div className="mx-auto flex max-w-[1240px] flex-col gap-8 px-5 pt-12 pb-[max(3rem,calc(env(safe-area-inset-bottom)+2rem))] sm:px-8 sm:pt-14 sm:pb-14 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -735,7 +735,7 @@ export default function HomePage() {
           <div className="flex flex-col gap-2.5 md:items-end">
             <Link
               href="/login"
-              className="rounded text-[14px] font-semibold text-cream/70 underline-offset-4 transition hover:text-cream hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              className="-my-1 inline-flex min-h-11 items-center rounded text-[14.5px] font-semibold text-cream/70 underline-offset-4 transition hover:text-cream hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold md:justify-end"
             >
               Staff sign-in
             </Link>

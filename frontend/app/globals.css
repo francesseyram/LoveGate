@@ -29,10 +29,35 @@
   --font-jakarta: var(--font-plus-jakarta);
 }
 
+html {
+  /* Stops iOS inflating body copy when a phone is turned to landscape, which
+     otherwise breaks every carefully set type scale below. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background: var(--color-cream);
   color: var(--color-charcoal);
   font-family: var(--font-sans), sans-serif;
+  /* The grey box iOS flashes over any tapped link is not part of the design,
+     and every interactive element here has its own :active and focus state. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Nothing in this app scrolls sideways. Saying so kills the rubber-band drag
+   that otherwise makes a phone feel like the layout is broken. */
+body,
+html {
+  overscroll-behavior-x: none;
+}
+
+/* The check-in desk and the ticket are read at arm's length in a dark hall;
+   thin strokes disappear there, so never let a client hint them thinner. */
+@media (max-width: 640px) {
+  body {
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
 ::selection {

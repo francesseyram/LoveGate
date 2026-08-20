@@ -323,7 +323,7 @@ function AttendeeTable({
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search name, email, ticket or inviter…"
           aria-label="Search attendees"
-          className="w-full rounded-xl border border-cream/15 bg-cream/[0.04] px-4 py-2 text-[14px] text-cream placeholder:text-cream/30 outline-none focus:border-gold sm:w-72"
+          className="h-11 w-full rounded-xl border border-cream/15 bg-cream/[0.04] px-4 text-[16px] text-cream placeholder:text-cream/30 outline-none focus:border-gold sm:w-72"
         />
       </div>
 
@@ -332,7 +332,7 @@ function AttendeeTable({
           <button
             key={filter.value}
             onClick={() => setStatus(filter.value)}
-            className={`rounded-full border px-3.5 py-1.5 font-[family-name:var(--font-oswald)] text-[11px] tracking-[0.1em] uppercase transition ${
+            className={`flex min-h-10 items-center rounded-full border px-4 font-[family-name:var(--font-oswald)] text-[11.5px] tracking-[0.1em] uppercase transition ${
               status === filter.value
                 ? "border-gold/50 bg-gold/12 text-gold"
                 : "border-cream/12 text-cream/45 hover:text-cream/75"
@@ -398,7 +398,7 @@ function AttendeeTable({
           {attendees.length === 0 ? "Nobody has registered yet." : "Nobody matches that."}
         </p>
       ) : (
-        <div className="mt-4 max-h-[560px] overflow-y-auto rounded-xl border border-cream/12">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-cream/12 sm:max-h-[560px] sm:overflow-y-auto">
           <table className="w-full border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-[#180A08]">
               <tr className="font-[family-name:var(--font-oswald)] text-[10px] tracking-[0.12em] text-cream/40 uppercase">
@@ -408,7 +408,7 @@ function AttendeeTable({
                     checked={allVisibleSelected}
                     onChange={toggleAllVisible}
                     aria-label="Select everyone shown"
-                    className="h-4 w-4 accent-[#B23A48]"
+                    className="h-5 w-5 accent-[#B23A48]"
                   />
                 </th>
                 <th scope="col" className="w-[34%] px-3 py-2.5 font-medium">
@@ -442,7 +442,7 @@ function AttendeeTable({
                         checked={checked}
                         onChange={() => toggle(person.id)}
                         aria-label={`Select ${person.name}`}
-                        className="h-4 w-4 accent-[#B23A48]"
+                        className="h-5 w-5 accent-[#B23A48]"
                       />
                     </td>
                     <td className="max-w-[1px] px-3 py-2.5">
@@ -476,7 +476,7 @@ function AttendeeTable({
                             onClick={() => void handleUndoCheckIn(person)}
                             disabled={undoingId === person.id}
                             title={`Mark ${person.name} as not arrived`}
-                            className="rounded border border-cream/15 px-2 py-0.5 text-[11.5px] whitespace-nowrap text-cream/40 transition hover:border-gold/40 hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold disabled:opacity-40"
+                            className="inline-flex min-h-8 items-center rounded border border-cream/15 px-2.5 text-[11.5px] whitespace-nowrap text-cream/40 transition hover:border-gold/40 hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold disabled:opacity-40"
                           >
                             {undoingId === person.id ? "Undoing…" : "Undo"}
                           </button>
@@ -593,17 +593,17 @@ function DashboardTool() {
 
   return (
     <main
-      className={`${anton.variable} ${oswald.variable} relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
+      className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
     >
       <FireBackground />
 
-      <div className="relative z-10 flex min-h-screen flex-col">
+      <div className="relative z-10 flex min-h-[100svh] flex-col">
         <StaffNav events={events} eventId={eventId} onEventChange={setEventId} />
 
-        <div className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 sm:py-9">
+        <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))] sm:px-8 sm:pt-9 sm:pb-9">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="font-[family-name:var(--font-anton)] text-[clamp(38px,7vw,60px)] leading-[0.95] tracking-[-0.01em] text-cream uppercase">
+              <h1 className="font-[family-name:var(--font-anton)] text-[clamp(34px,9vw,60px)] leading-[0.95] tracking-[-0.01em] text-cream uppercase">
                 Dashboard
               </h1>
               {selectedEvent && (
@@ -645,7 +645,7 @@ function DashboardTool() {
             <div
               className={`mt-7 flex flex-col gap-5 transition-opacity ${refreshing ? "opacity-60" : "opacity-100"}`}
             >
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <Stat label="Registered" value={data.totals.registered} />
                 <Stat label="In the room" value={data.totals.checkedIn} accent="sage" />
                 <Stat label="Yet to arrive" value={data.totals.yetToArrive} accent="gold" />
