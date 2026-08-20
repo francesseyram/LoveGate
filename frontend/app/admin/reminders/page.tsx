@@ -214,11 +214,11 @@ function ReminderTool() {
 
   return (
     <main
-      className={`${anton.variable} ${oswald.variable} relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
+      className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
     >
       <FireBackground />
 
-      <div className="relative z-10 flex min-h-screen flex-col">
+      <div className="relative z-10 flex min-h-[100svh] flex-col">
         <StaffNav
           events={events}
           eventId={eventId}
@@ -229,7 +229,7 @@ function ReminderTool() {
           }}
         />
 
-        <div className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 sm:py-9">
+        <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))] sm:px-8 sm:pt-9 sm:pb-9">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="font-[family-name:var(--font-anton)] text-[clamp(34px,6vw,54px)] leading-[0.95] tracking-[-0.01em] text-cream uppercase">

@@ -87,6 +87,34 @@ describe("buildHourSeries", () => {
   it("is empty before the doors open", () => {
     expect(buildHourSeries([])).toEqual([]);
   });
+
+  it("wraps midnight instead of filling the empty afternoon", () => {
+    const series = buildHourSeries([
+      new Date("2026-08-18T22:10:00Z"),
+      new Date("2026-08-18T23:40:00Z"),
+      new Date("2026-08-19T00:15:00Z"),
+      new Date("2026-08-19T01:05:00Z"),
+    ]);
+    expect(series).toEqual([
+      { hour: 22, count: 1 },
+      { hour: 23, count: 1 },
+      { hour: 0, count: 1 },
+      { hour: 1, count: 1 },
+    ]);
+  });
+
+  it("zero-fills quiet hours across midnight the same way it does in the evening", () => {
+    const series = buildHourSeries([
+      new Date("2026-08-18T22:10:00Z"),
+      new Date("2026-08-19T01:05:00Z"),
+    ]);
+    expect(series).toEqual([
+      { hour: 22, count: 1 },
+      { hour: 23, count: 0 },
+      { hour: 0, count: 0 },
+      { hour: 1, count: 1 },
+    ]);
+  });
 });
 
 describe("topCategories", () => {

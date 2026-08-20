@@ -13,7 +13,8 @@ setGlobalOptions({ region: "europe-west1", maxInstances: 20 });
 
 export { getPublishedEvents, getEvent } from "./events";
 export { registerForEvent } from "./registration";
-export { checkInByQr, checkInByRegistrationId, searchRegistrations } from "./checkin";
+export { checkInByQr, checkInByRegistrationId, undoCheckIn, searchRegistrations } from "./checkin";
+export { getEventSettings, setEventAutoCheckIn } from "./eventSettings";
 export { getEventRoster, getEventStats, syncCheckIns } from "./roster";
 export { getEventDashboard, deleteRegistration } from "./dashboard";
 export { searchSelfCheckin, selfCheckIn } from "./selfCheckin";

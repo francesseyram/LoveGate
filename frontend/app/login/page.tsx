@@ -112,15 +112,15 @@ export default function LoginPage() {
   }
 
   const fieldClass =
-    "mt-2 h-13 w-full rounded-xl border-[1.5px] border-line bg-canvas px-4 text-[15.5px] text-ink outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/12";
+    "mt-2 h-13 w-full rounded-xl border-[1.5px] border-line bg-canvas px-4 text-[16px] text-ink outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/12";
   const labelClass = "text-[12.5px] font-bold tracking-[0.06em] text-ink/55 uppercase";
 
   return (
     <div
-      className={`${jakarta.variable} min-h-screen font-[family-name:var(--font-plus-jakarta)] lg:grid lg:grid-cols-[1.05fr_1fr]`}
+      className={`${jakarta.variable} min-h-[100svh] font-[family-name:var(--font-plus-jakarta)] lg:grid lg:grid-cols-[1.05fr_1fr]`}
     >
       {/* Brand panel */}
-      <section className="relative isolate overflow-hidden bg-[#120807] px-6 py-10 sm:px-10 lg:flex lg:flex-col lg:justify-between lg:px-14 lg:py-14">
+      <section className="relative isolate overflow-hidden bg-[#120807] px-5 pt-[max(2.5rem,calc(env(safe-area-inset-top)+1.5rem))] pb-10 sm:px-10 lg:flex lg:flex-col lg:justify-between lg:px-14 lg:py-14">
         <div
           aria-hidden
           className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(178,58,72,0.45)_0%,transparent_58%)]"
@@ -133,7 +133,7 @@ export default function LoginPage() {
         <div className="relative">
           <Link
             href="/"
-            className="inline-flex items-center gap-2.5 rounded-lg text-cream focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
+            className="-ml-1 inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1 text-cream focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral text-cream">
               <GateMark className="h-5 w-5" />
@@ -182,7 +182,7 @@ export default function LoginPage() {
       </section>
 
       {/* Form */}
-      <section className="flex flex-1 items-center justify-center bg-canvas px-6 py-12 sm:px-10 lg:px-14">
+      <section className="flex flex-1 items-center justify-center bg-canvas px-5 pt-12 pb-[max(3rem,calc(env(safe-area-inset-bottom)+2rem))] sm:px-10 lg:px-14">
         <div className="w-full max-w-[420px]">
           <h2 className="text-[26px] font-extrabold tracking-[-0.03em] text-ink sm:text-[30px]">
             Staff sign-in
@@ -263,7 +263,7 @@ export default function LoginPage() {
 
           <Link
             href="/"
-            className="mt-8 inline-block rounded text-[14px] font-semibold text-ink/50 underline-offset-4 transition hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
+            className="mt-7 inline-flex min-h-11 items-center rounded text-[14.5px] font-semibold text-ink/50 underline-offset-4 transition hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
           >
             ← Back to events
           </Link>

@@ -61,6 +61,38 @@ function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObjectStore)
   );
 }
 
+/**
+ * Queue flushes that have started but not finished.
+ *
+ * `syncCheckIns` reads the queue into memory before it awaits the server, so
+ * deleting a row from IndexedDB cannot recall a flush already in progress.
+ * Anything that needs the queue to be settled — reverting a check-in — waits
+ * these out first.
+ *
+ * Module scope because the queue is per-origin: the dashboard and the check-in
+ * console are separate pages that share one IndexedDB, and a revert triggered
+ * from one has to account for a flush started by the other. It cannot see
+ * another *tab* or another device, which is why the server also stamps
+ * `revertedAt` — see backend/functions/src/roster.ts.
+ */
+const inflightFlushes = new Set<Promise<void>>();
+
+export function trackQueueFlush<T>(run: () => Promise<T>): Promise<T> {
+  const work = run();
+  // Never rejects, so one failed flush can't reject an unrelated waiter.
+  const gate = work.then(
+    () => {},
+    () => {}
+  );
+  inflightFlushes.add(gate);
+  void gate.then(() => inflightFlushes.delete(gate));
+  return work;
+}
+
+export async function settleQueueFlushes(): Promise<void> {
+  await Promise.all([...inflightFlushes]);
+}
+
 export async function saveRoster(roster: CachedRoster): Promise<void> {
   await tx(ROSTER_STORE, "readwrite", (s) => s.put(roster));
 }
@@ -99,6 +131,27 @@ export async function markRosterEntryCheckedIn(
   if (!roster) return;
   const next = roster.entries.map((entry) =>
     entry.id === registrationId ? { ...entry, status: "checked_in" as const, checkedInAt } : entry
+  );
+  await saveRoster({ ...roster, entries: next });
+}
+
+/**
+ * Reverts someone to "not arrived" in the cached roster.
+ *
+ * The counterpart to markRosterEntryCheckedIn, and only ever reached with a
+ * connection: undoing has to be dequeued and confirmed by the server, so unlike
+ * a check-in it is never recorded offline for later.
+ */
+export async function markRosterEntryNotCheckedIn(
+  eventId: string,
+  registrationId: string
+): Promise<void> {
+  const roster = await loadRoster(eventId);
+  if (!roster) return;
+  const next = roster.entries.map((entry) =>
+    entry.id === registrationId
+      ? { ...entry, status: "going" as const, checkedInAt: null }
+      : entry
   );
   await saveRoster({ ...roster, entries: next });
 }

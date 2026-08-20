@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { getEventRoster, syncCheckIns, getCallableErrorMessage } from "./functions";
+import { revertCheckIn } from "./revertCheckIn";
 import {
   saveRoster,
   loadRoster,
@@ -9,6 +10,7 @@ import {
   getQueue,
   removeFromQueue,
   markRosterEntryCheckedIn,
+  trackQueueFlush,
   type CachedRoster,
   type RosterEntry,
 } from "./offlineStore";
@@ -17,6 +19,11 @@ export type CheckinOutcome =
   | { result: "checked_in"; name: string; offline: boolean }
   | { result: "already_checked_in"; name: string; offline: boolean }
   | { result: "not_found" };
+
+export type UndoOutcome =
+  | { result: "reverted"; name: string }
+  | { result: "not_checked_in"; name: string }
+  | { result: "failed"; name: string; message: string };
 
 /** Connectivity is external browser state, so subscribe to it rather than mirroring it into an effect. */
 function subscribeToConnectivity(onChange: () => void) {
@@ -45,29 +52,43 @@ export function useOfflineCheckin(eventId: string) {
     setPendingCount((await getQueue(eventId)).length);
   }, [eventId]);
 
-  /** Flushes anything recorded while offline. Safe to call repeatedly. */
+  /**
+   * Flushes anything recorded while offline. Safe to call repeatedly.
+   *
+   * Registered with `trackQueueFlush` so a revert — from this page or from the
+   * dashboard — can wait for it. Once this has read the queue it is committed
+   * to sending it, and deleting the IndexedDB row underneath cannot stop that.
+   */
   const sync = useCallback(async () => {
     if (!eventId || !navigator.onLine) return;
-    const queue = await getQueue(eventId);
-    if (queue.length === 0) return;
 
-    try {
-      const result = await syncCheckIns({
-        eventId,
-        checkIns: queue.map((q) => ({ registrationId: q.registrationId, checkedInAt: q.checkedInAt })),
-      });
-      // Drop anything the server has now accounted for — including rows it
-      // says were already checked in, otherwise they'd retry forever.
-      const settled = new Set([
-        ...result.applied,
-        ...result.alreadyCheckedIn,
-        ...result.notFound,
-      ]);
-      await removeFromQueue(queue.filter((q) => settled.has(q.registrationId)).map((q) => q.key));
-      await refreshPendingCount();
-    } catch (err) {
-      setError(getCallableErrorMessage(err));
-    }
+    await trackQueueFlush(async () => {
+      try {
+        const queue = await getQueue(eventId);
+        if (queue.length === 0) return;
+
+        const result = await syncCheckIns({
+          eventId,
+          checkIns: queue.map((q) => ({
+            registrationId: q.registrationId,
+            checkedInAt: q.checkedInAt,
+          })),
+        });
+        // Drop anything the server has now accounted for — including rows it
+        // says were already checked in or has since reverted, otherwise they'd
+        // retry forever.
+        const settled = new Set([
+          ...result.applied,
+          ...result.alreadyCheckedIn,
+          ...result.notFound,
+          ...(result.reverted ?? []),
+        ]);
+        await removeFromQueue(queue.filter((q) => settled.has(q.registrationId)).map((q) => q.key));
+        await refreshPendingCount();
+      } catch (err) {
+        setError(getCallableErrorMessage(err));
+      }
+    });
   }, [eventId, refreshPendingCount]);
 
   /** Pulls the attendee list down for offline use. */
@@ -179,6 +200,53 @@ export function useOfflineCheckin(eventId: string) {
     [eventId, refreshPendingCount, sync]
   );
 
+  /**
+   * Puts someone back to "not arrived" after a mistaken check-in.
+   *
+   * Unlike checkIn this waits on the server and refuses to run offline. A
+   * check-in can be replayed later because it is additive; an undo cannot,
+   * because the queue it would have to fight with is a queue of check-ins.
+   * `revertCheckIn` owns the ordering that makes it safe.
+   */
+  const undo = useCallback(
+    async (entry: RosterEntry): Promise<UndoOutcome> => {
+      if (entry.status !== "checked_in") {
+        return { result: "not_checked_in", name: entry.name };
+      }
+      if (!navigator.onLine) {
+        return {
+          result: "failed",
+          name: entry.name,
+          message: "Undo needs a connection. Try again once you are back online.",
+        };
+      }
+
+      try {
+        await revertCheckIn({ eventId, registrationId: entry.id });
+      } catch (err) {
+        // The queue row is already gone either way, so the badge has to be
+        // re-read whether this succeeded or not.
+        await refreshPendingCount();
+        return { result: "failed", name: entry.name, message: getCallableErrorMessage(err) };
+      }
+
+      await refreshPendingCount();
+      setRoster((prev) =>
+        prev
+          ? {
+              ...prev,
+              entries: prev.entries.map((e) =>
+                e.id === entry.id ? { ...e, status: "going" as const, checkedInAt: null } : e
+              ),
+            }
+          : prev
+      );
+
+      return { result: "reverted", name: entry.name };
+    },
+    [eventId, refreshPendingCount]
+  );
+
   return {
     roster,
     online,
@@ -190,6 +258,7 @@ export function useOfflineCheckin(eventId: string) {
     findByQr,
     search,
     checkIn,
+    undoCheckIn: undo,
     sync,
     reloadRoster: () => loadEventRoster(true),
   };

@@ -57,6 +57,23 @@ export interface CheckInResult {
   registration: RegistrationSummary;
 }
 
+export interface UndoCheckInResult {
+  /** `not_checked_in` when they were already back to "not arrived" — not an error. */
+  outcome: "reverted" | "not_checked_in";
+  registration: RegistrationSummary;
+}
+
+/**
+ * Per-event operational switches. Mirrors backend/functions/src/eventSettings.ts.
+ * Staff-only, and deliberately not part of `EventSummary` — that one is public.
+ */
+export interface EventSettings {
+  eventId: string;
+  /** Late-arrival mode: new registrations land already checked in. */
+  autoCheckIn: boolean;
+  autoCheckInSince: string | null;
+}
+
 /* -------------------------------------------------------------------------
    Admin dashboard
    Mirrors backend/functions/src/dashboard.ts + analytics.ts. The buckets are

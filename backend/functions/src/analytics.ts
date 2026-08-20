@@ -87,6 +87,11 @@ export interface HourBucket {
  * Arrivals by hour of day, trimmed to the span that actually has arrivals.
  * A fixed 24-hour axis for a four-hour event is twenty columns of nothing,
  * and it flattens the door rush that the chart exists to show.
+ *
+ * Hours are a circle, not a line: an event that runs 10pm–1am occupies 22, 23,
+ * 0 and 1. Filling min..max would draw 0 through 23 and bury the rush in a
+ * day of empty afternoon columns. The span is the shortest arc that covers
+ * every occupied hour, wrapping midnight when that is the shorter path.
  */
 export function buildHourSeries(dates: Date[]): HourBucket[] {
   if (dates.length === 0) return [];
@@ -97,9 +102,27 @@ export function buildHourSeries(dates: Date[]): HourBucket[] {
     counts.set(hour, (counts.get(hour) ?? 0) + 1);
   }
 
-  const hours = Array.from(counts.keys());
+  const occupied = Array.from(counts.keys()).sort((a, b) => a - b);
+  const n = occupied.length;
+
+  // Largest empty gap on the 24-hour circle. The series is everything else:
+  // start just after that gap and walk until it begins again.
+  let largestGap = 0;
+  let start = occupied[0];
+  for (let i = 0; i < n; i++) {
+    const current = occupied[i];
+    const next = occupied[(i + 1) % n];
+    const gap = (next - current - 1 + 24) % 24;
+    if (gap >= largestGap) {
+      largestGap = gap;
+      start = next;
+    }
+  }
+
   const series: HourBucket[] = [];
-  for (let hour = Math.min(...hours); hour <= Math.max(...hours); hour++) {
+  const length = 24 - largestGap;
+  for (let i = 0; i < length; i++) {
+    const hour = (start + i) % 24;
     series.push({ hour, count: counts.get(hour) ?? 0 });
   }
   return series;

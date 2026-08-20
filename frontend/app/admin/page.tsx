@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Anton, Oswald } from "next/font/google";
 import { AuthGuard } from "@/components/AuthGuard";
+import { AutoCheckInSwitch } from "@/components/AutoCheckInSwitch";
 import { FireBackground } from "@/components/FireBackground";
 import { StaffNav } from "@/components/StaffNav";
 import {
@@ -19,6 +20,7 @@ import {
   getEventDashboard,
   getPublishedEvents,
 } from "@/lib/functions";
+import { revertCheckIn } from "@/lib/revertCheckIn";
 import type { Dashboard, DashboardAttendee, EventSummary } from "@/lib/types";
 
 /**
@@ -217,6 +219,10 @@ type StatusFilter = "all" | "checked_in" | "going";
  * Deletion is here rather than on the check-in console on purpose: at the door
  * the destructive action sits one mis-tap from the check-in button, and a
  * volunteer under queue pressure should not be able to reach it at all.
+ *
+ * Undoing a check-in sits next to it but is a different weight of action —
+ * reversible by checking the person in again — so it stays a single click with
+ * no confirmation, where deleting takes a selection and a confirmation.
  */
 function AttendeeTable({
   attendees,
@@ -232,6 +238,7 @@ function AttendeeTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const rows = useMemo(() => {
@@ -278,6 +285,21 @@ function AttendeeTable({
       else visibleIds.forEach((id) => next.add(id));
       return next;
     });
+  }
+
+  async function handleUndoCheckIn(person: DashboardAttendee) {
+    setUndoingId(person.id);
+    setError(null);
+    try {
+      // Shared with the door console: dropping the queued scan is only half of
+      // it, and this page has no hook to wait out a flush already in progress.
+      await revertCheckIn({ eventId, registrationId: person.id });
+      await onChanged();
+    } catch (err) {
+      setError(`Could not undo ${person.name}'s check-in. ${getCallableErrorMessage(err)}`);
+    } finally {
+      setUndoingId(null);
+    }
   }
 
   async function handleDelete() {
@@ -328,7 +350,7 @@ function AttendeeTable({
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search name, phone, email, ticket or inviter…"
           aria-label="Search attendees"
-          className="w-full rounded-xl border border-cream/15 bg-cream/[0.04] px-4 py-2 text-[14px] text-cream placeholder:text-cream/30 outline-none focus:border-gold sm:w-72"
+          className="h-11 w-full rounded-xl border border-cream/15 bg-cream/[0.04] px-4 text-[16px] text-cream placeholder:text-cream/30 outline-none focus:border-gold sm:w-72"
         />
       </div>
 
@@ -337,7 +359,7 @@ function AttendeeTable({
           <button
             key={filter.value}
             onClick={() => setStatus(filter.value)}
-            className={`rounded-full border px-3.5 py-1.5 font-[family-name:var(--font-oswald)] text-[11px] tracking-[0.1em] uppercase transition ${
+            className={`flex min-h-10 items-center rounded-full border px-4 font-[family-name:var(--font-oswald)] text-[11.5px] tracking-[0.1em] uppercase transition ${
               status === filter.value
                 ? "border-gold/50 bg-gold/12 text-gold"
                 : "border-cream/12 text-cream/45 hover:text-cream/75"
@@ -403,7 +425,7 @@ function AttendeeTable({
           {attendees.length === 0 ? "Nobody has registered yet." : "Nobody matches that."}
         </p>
       ) : (
-        <div className="mt-4 max-h-[560px] overflow-y-auto rounded-xl border border-cream/12">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-cream/12 sm:max-h-[560px] sm:overflow-y-auto">
           <table className="w-full border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-[#180A08]">
               <tr className="font-[family-name:var(--font-oswald)] text-[10px] tracking-[0.12em] text-cream/40 uppercase">
@@ -413,7 +435,7 @@ function AttendeeTable({
                     checked={allVisibleSelected}
                     onChange={toggleAllVisible}
                     aria-label="Select everyone shown"
-                    className="h-4 w-4 accent-[#B23A48]"
+                    className="h-5 w-5 accent-[#B23A48]"
                   />
                 </th>
                 <th scope="col" className="w-[28%] px-3 py-2.5 font-medium">
@@ -450,7 +472,7 @@ function AttendeeTable({
                         checked={checked}
                         onChange={() => toggle(person.id)}
                         aria-label={`Select ${person.name}`}
-                        className="h-4 w-4 accent-[#B23A48]"
+                        className="h-5 w-5 accent-[#B23A48]"
                       />
                     </td>
                     <td className="max-w-[1px] px-3 py-2.5">
@@ -497,10 +519,20 @@ function AttendeeTable({
                     </td>
                     <td className="px-3 py-2.5 align-top">
                       {person.status === "checked_in" ? (
-                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-sage">
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage" />
-                          {person.checkedInAt ? timeOfDay(person.checkedInAt) : "In"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-sage">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage" />
+                            {person.checkedInAt ? timeOfDay(person.checkedInAt) : "In"}
+                          </span>
+                          <button
+                            onClick={() => void handleUndoCheckIn(person)}
+                            disabled={undoingId === person.id}
+                            title={`Mark ${person.name} as not arrived`}
+                            className="inline-flex min-h-8 items-center rounded border border-cream/15 px-2.5 text-[11.5px] whitespace-nowrap text-cream/40 transition hover:border-gold/40 hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold disabled:opacity-40"
+                          >
+                            {undoingId === person.id ? "Undoing…" : "Undo"}
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-[12.5px] whitespace-nowrap text-cream/35">
                           Not arrived
@@ -613,17 +645,17 @@ function DashboardTool() {
 
   return (
     <main
-      className={`${anton.variable} ${oswald.variable} relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
+      className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
     >
       <FireBackground />
 
-      <div className="relative z-10 flex min-h-screen flex-col">
+      <div className="relative z-10 flex min-h-[100svh] flex-col">
         <StaffNav events={events} eventId={eventId} onEventChange={setEventId} />
 
-        <div className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 sm:px-8 sm:py-9">
+        <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))] sm:px-8 sm:pt-9 sm:pb-9">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="font-[family-name:var(--font-anton)] text-[clamp(38px,7vw,60px)] leading-[0.95] tracking-[-0.01em] text-cream uppercase">
+              <h1 className="font-[family-name:var(--font-anton)] text-[clamp(34px,9vw,60px)] leading-[0.95] tracking-[-0.01em] text-cream uppercase">
                 Dashboard
               </h1>
               {selectedEvent && (
@@ -665,7 +697,7 @@ function DashboardTool() {
             <div
               className={`mt-7 flex flex-col gap-5 transition-opacity ${refreshing ? "opacity-60" : "opacity-100"}`}
             >
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <Stat label="Registered" value={data.totals.registered} />
                 <Stat label="In the room" value={data.totals.checkedIn} accent="sage" />
                 <Stat label="Yet to arrive" value={data.totals.yetToArrive} accent="gold" />
@@ -683,6 +715,8 @@ function DashboardTool() {
               <div className="rounded-2xl border border-cream/12 bg-[#0D0705]/50 px-5 py-4">
                 <RoomFill checkedIn={data.totals.checkedIn} total={data.totals.registered} />
               </div>
+
+              <AutoCheckInSwitch eventId={eventId} onChanged={refresh} />
 
               <div className="grid gap-5 lg:grid-cols-2">
                 <Card title="Signups per day" hint="Accra time">

@@ -43,7 +43,7 @@ export default function ReviveEventPage() {
 
   if (error) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#0D0705] px-6 text-center text-[#FBF3E7]">
+      <main className="flex min-h-[100svh] items-center justify-center bg-[#0D0705] px-6 text-center text-[#FBF3E7]">
         <p>{error}</p>
       </main>
     );
@@ -51,15 +51,15 @@ export default function ReviveEventPage() {
 
   if (!event) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#0D0705] text-sm text-[#FBF3E7]/60">
+      <main className="flex min-h-[100svh] items-center justify-center bg-[#0D0705] text-sm text-[#FBF3E7]/60">
         Loading…
       </main>
     );
   }
 
   return (
-    <div className={`${anton.variable} ${oswald.variable} min-h-screen bg-[#0D0705] font-sans`}>
-      <section className="relative flex min-h-screen flex-col items-center overflow-hidden">
+    <div className={`${anton.variable} ${oswald.variable} min-h-[100svh] bg-[#0D0705] font-sans`}>
+      <section className="relative flex min-h-[100svh] flex-col items-center overflow-hidden">
         {/* Gradient + brightness/scale pulse live on their own layer — `filter` on
             an ancestor of the badge image would isolate it into a new stacking
             context and break its mix-blend-mode against this background. */}
@@ -73,12 +73,12 @@ export default function ReviveEventPage() {
         />
         <FireBackground />
 
-        <div className="relative z-10 flex min-h-screen w-full flex-col items-center justify-center gap-10 px-4 pt-28 pb-14 text-center sm:pt-32 sm:pb-16">
+        <div className="relative z-10 flex min-h-[100svh] w-full flex-col items-center justify-center gap-7 px-5 pt-[max(5rem,calc(env(safe-area-inset-top)+4.5rem))] pb-12 text-center sm:gap-10 sm:pt-32 sm:pb-16">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/assets/love-inc-globe-white.png"
             alt="Love Inc Global · Est. 2022"
-            className="block w-28"
+            className="block w-20 sm:w-28"
           />
 
           <div>
@@ -96,19 +96,19 @@ export default function ReviveEventPage() {
         </div>
       </section>
 
-      <section className="bg-[linear-gradient(180deg,#170807,#0D0705)] px-5 pt-16 pb-24">
+      <section className="bg-[linear-gradient(180deg,#170807,#0D0705)] px-5 pt-14 pb-20 sm:pt-16 sm:pb-24">
         <div className="mx-auto max-w-[760px]">
           <div className="mb-3 text-sm font-bold tracking-[0.12em] text-gold uppercase">About</div>
-          <div className="mb-4 font-[family-name:var(--font-oswald)] text-[32px] font-semibold text-[#FBF3E7] sm:text-[38px]">
+          <div className="mb-4 font-[family-name:var(--font-oswald)] text-[clamp(27px,7.5vw,38px)] leading-tight font-semibold text-[#FBF3E7]">
             What to expect
           </div>
-          <div className="mb-9 max-w-[62ch] text-lg leading-[1.7] whitespace-pre-line text-[#FBF3E7]/70">
+          <div className="mb-9 max-w-[62ch] text-[16.5px] leading-[1.7] whitespace-pre-line text-[#FBF3E7]/70 sm:text-lg">
             {event.description}
           </div>
 
-          <div className="mb-14 flex flex-col gap-4">
-            <div className="flex items-center gap-3.5">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <div className="mb-12 flex flex-col gap-4 sm:mb-14">
+            <div className="flex items-start gap-3.5">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mt-1 shrink-0">
                 <rect x="3" y="5" width="18" height="16" rx="2" stroke="#D9A441" strokeWidth="1.6" />
                 <path
                   d="M3 9H21M8 3V6M16 3V6"
@@ -117,18 +117,18 @@ export default function ReviveEventPage() {
                   strokeLinecap="round"
                 />
               </svg>
-              <div className="text-lg text-[#FBF3E7]">
+              <div className="text-[16.5px] text-[#FBF3E7] sm:text-lg">
                 {formatDate(event.startsAt)} · {formatTime(event.startsAt)}
               </div>
             </div>
             {event.location && (
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-start gap-3.5">
                 <svg
                   width="20"
                   height="20"
                   viewBox="0 0 24 24"
                   fill="none"
-                  className="shrink-0"
+                  className="mt-1 shrink-0"
                   aria-hidden="true"
                 >
                   <path
@@ -143,7 +143,7 @@ export default function ReviveEventPage() {
                     href={event.locationUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group text-lg text-[#FBF3E7] underline decoration-gold/40 underline-offset-4 transition hover:decoration-gold"
+                    className="group text-[16.5px] text-[#FBF3E7] underline decoration-gold/40 underline-offset-4 transition hover:decoration-gold sm:text-lg"
                   >
                     {event.location}
                     <span className="ml-2 text-sm whitespace-nowrap text-gold">
@@ -151,7 +151,7 @@ export default function ReviveEventPage() {
                     </span>
                   </a>
                 ) : (
-                  <div className="text-lg text-[#FBF3E7]">{event.location}</div>
+                  <div className="text-[16.5px] text-[#FBF3E7] sm:text-lg">{event.location}</div>
                 )}
               </div>
             )}
@@ -170,8 +170,8 @@ export default function ReviveEventPage() {
         </div>
       </section>
 
-      <footer className="border-t border-[#FBF3E7]/10 px-5 py-8 text-center">
-        <Link href="/" className="text-[13px] text-[#FBF3E7]/50 hover:text-[#f0be6a]">
+      <footer className="border-t border-[#FBF3E7]/10 px-5 pt-8 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.25rem))] text-center">
+        <Link href="/" className="inline-block min-h-11 rounded px-4 py-3 text-[13.5px] text-[#FBF3E7]/50 transition hover:text-[#f0be6a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold">
           ← Back to LoveGate
         </Link>
       </footer>
