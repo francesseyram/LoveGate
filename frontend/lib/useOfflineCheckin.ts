@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   getEventRoster,
   syncCheckIns,
@@ -56,13 +56,26 @@ export function useOfflineCheckin(eventId: string) {
     setPendingCount((await getQueue(eventId)).length);
   }, [eventId]);
 
+  // sync() copies the queue, then awaits the server. An undo that only deletes
+  // the IndexedDB row cannot cancel that copy — so undo waits these out before
+  // telling the server to revert, otherwise a scan that was already in flight
+  // lands after the desk has shown "not arrived".
+  const inflightSyncs = useRef(new Set<Promise<void>>());
+
   /** Flushes anything recorded while offline. Safe to call repeatedly. */
   const sync = useCallback(async () => {
     if (!eventId || !navigator.onLine) return;
-    const queue = await getQueue(eventId);
-    if (queue.length === 0) return;
+
+    let settle!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    inflightSyncs.current.add(gate);
 
     try {
+      const queue = await getQueue(eventId);
+      if (queue.length === 0) return;
+
       const result = await syncCheckIns({
         eventId,
         checkIns: queue.map((q) => ({ registrationId: q.registrationId, checkedInAt: q.checkedInAt })),
@@ -78,6 +91,9 @@ export function useOfflineCheckin(eventId: string) {
       await refreshPendingCount();
     } catch (err) {
       setError(getCallableErrorMessage(err));
+    } finally {
+      inflightSyncs.current.delete(gate);
+      settle();
     }
   }, [eventId, refreshPendingCount]);
 
@@ -199,9 +215,10 @@ export function useOfflineCheckin(eventId: string) {
    * revert locally while a scan for the same person is still pending and the
    * next sync silently re-checks them in.
    *
-   * Dropping the pending scan first is what makes that safe: if their check-in
-   * never reached the server, the undo is complete the moment it leaves the
-   * queue, and the call below just confirms it.
+   * Dropping the pending scan first is what makes a *future* sync safe. An
+   * in-flight sync has already copied the queue, so we also wait those out
+   * before asking the server to revert — otherwise it can apply the check-in
+   * after this function has already shown "not arrived".
    */
   const undo = useCallback(
     async (entry: RosterEntry): Promise<UndoOutcome> => {
@@ -218,6 +235,7 @@ export function useOfflineCheckin(eventId: string) {
 
       await removeFromQueue([`${eventId}:${entry.id}`]);
       await refreshPendingCount();
+      await Promise.all([...inflightSyncs.current]);
 
       try {
         await undoCheckInCall({ eventId, registrationId: entry.id });

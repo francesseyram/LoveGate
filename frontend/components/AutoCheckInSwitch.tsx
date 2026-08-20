@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCallableErrorMessage, getEventSettings, setEventAutoCheckIn } from "@/lib/functions";
 
 /**
@@ -49,6 +49,8 @@ export function AutoCheckInSwitch({
   const [loaded, setLoaded] = useState<Settings | null>(null);
   const [savingFor, setSavingFor] = useState<string | null>(null);
   const [failure, setFailure] = useState<{ eventId: string; message: string } | null>(null);
+  const eventIdRef = useRef(eventId);
+  eventIdRef.current = eventId;
 
   const settings = loaded?.eventId === eventId ? loaded : null;
   const saving = savingFor === eventId;
@@ -76,22 +78,26 @@ export function AutoCheckInSwitch({
 
   async function toggle() {
     if (!settings || saving) return;
+    const requestedId = eventId;
+    const previous = settings;
     const next = !settings.autoCheckIn;
 
     // Move the switch first: it is the one control on this page whose position
     // *is* the state, so it should never lag behind the tap that moved it.
-    setLoaded({ eventId, autoCheckIn: next, since: next ? new Date().toISOString() : null });
-    setSavingFor(eventId);
+    setLoaded({ eventId: requestedId, autoCheckIn: next, since: next ? new Date().toISOString() : null });
+    setSavingFor(requestedId);
     setFailure(null);
     try {
-      const fresh = await setEventAutoCheckIn({ eventId, enabled: next });
-      setLoaded({ eventId, autoCheckIn: fresh.autoCheckIn, since: fresh.autoCheckInSince });
+      const fresh = await setEventAutoCheckIn({ eventId: requestedId, enabled: next });
+      if (eventIdRef.current !== requestedId) return;
+      setLoaded({ eventId: requestedId, autoCheckIn: fresh.autoCheckIn, since: fresh.autoCheckInSince });
       await onChanged?.();
     } catch (err) {
-      setLoaded(settings);
-      setFailure({ eventId, message: getCallableErrorMessage(err) });
+      if (eventIdRef.current !== requestedId) return;
+      setLoaded(previous);
+      setFailure({ eventId: requestedId, message: getCallableErrorMessage(err) });
     } finally {
-      setSavingFor((current) => (current === eventId ? null : current));
+      setSavingFor((current) => (current === requestedId ? null : current));
     }
   }
 
