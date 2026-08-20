@@ -103,6 +103,24 @@ function timeOfDay(iso: string): string {
   });
 }
 
+/**
+ * Numbers are stored digits-only, which is unreadable in a column staff scan
+ * down and awkward to read aloud. Group them the way they're written in Ghana:
+ * 0XX XXX XXXX locally, +233 XX XXX XXXX when dialled internationally.
+ * Anything that doesn't fit either shape is left exactly as entered rather
+ * than mangled into a wrong-looking number.
+ */
+function formatPhone(raw: string): string {
+  const digits = (raw ?? "").replace(/\D/g, "");
+  if (digits.length === 10 && digits.startsWith("0")) {
+    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  }
+  if (digits.length === 12 && digits.startsWith("233")) {
+    return `+233 ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
+  }
+  return raw;
+}
+
 /* -------------------------------------------------------------------------
    Pieces
    ---------------------------------------------------------------------- */
@@ -228,10 +246,17 @@ function AttendeeTable({
     return attendees.filter((person) => {
       if (status !== "all" && person.status !== status) return false;
       if (!q) return true;
+      // Compared digit-only so a number pasted as "024 123 4567" or
+      // "+233241234567" still finds a record stored as "0241234567".
+      const qDigits = q.replace(/\D/g, "");
+      const phoneMatches =
+        qDigits.length >= 3 && person.phone.replace(/\D/g, "").includes(qDigits);
+
       return (
         person.name.toLowerCase().includes(q) ||
         person.email.toLowerCase().includes(q) ||
         person.ticketRef.toLowerCase().includes(q) ||
+        phoneMatches ||
         // Matching the inviter turns the search box into "show me everyone
         // Ama brought", which is the question a referral field exists to answer.
         person.invitedBy.toLowerCase().includes(q)
@@ -323,7 +348,7 @@ function AttendeeTable({
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search name, email, ticket or inviter…"
+          placeholder="Search name, phone, email, ticket or inviter…"
           aria-label="Search attendees"
           className="h-11 w-full rounded-xl border border-cream/15 bg-cream/[0.04] px-4 text-[16px] text-cream placeholder:text-cream/30 outline-none focus:border-gold sm:w-72"
         />
@@ -413,10 +438,13 @@ function AttendeeTable({
                     className="h-5 w-5 accent-[#B23A48]"
                   />
                 </th>
-                <th scope="col" className="w-[34%] px-3 py-2.5 font-medium">
+                <th scope="col" className="w-[28%] px-3 py-2.5 font-medium">
                   Name
                 </th>
-                <th scope="col" className="hidden px-3 py-2.5 font-medium sm:table-cell">
+                <th scope="col" className="hidden w-[16%] px-3 py-2.5 font-medium sm:table-cell">
+                  Phone
+                </th>
+                <th scope="col" className="hidden px-3 py-2.5 font-medium lg:table-cell">
                   Ticket
                 </th>
                 <th scope="col" className="hidden w-[20%] px-3 py-2.5 font-medium lg:table-cell">
@@ -450,11 +478,33 @@ function AttendeeTable({
                     <td className="max-w-[1px] px-3 py-2.5">
                       <p className="truncate text-[14.5px] font-medium text-cream">{person.name}</p>
                       <p className="truncate text-[12.5px] text-cream/40">{person.email}</p>
-                      <p className="truncate text-[12px] text-cream/35 sm:hidden">
+                      {/* Below sm the phone and ticket columns are hidden, so
+                          they stack under the name rather than disappearing. */}
+                      {person.phone && (
+                        <p className="truncate text-[12.5px] text-cream/55 tabular-nums sm:hidden">
+                          {formatPhone(person.phone)}
+                        </p>
+                      )}
+                      <p className="truncate text-[12px] text-cream/35 lg:hidden">
                         {person.ticketRef}
                       </p>
                     </td>
-                    <td className="hidden px-3 py-2.5 align-top font-[family-name:var(--font-oswald)] text-[12.5px] text-cream/45 tabular-nums sm:table-cell">
+                    <td className="hidden px-3 py-2.5 align-top sm:table-cell">
+                      {person.phone ? (
+                        // Tappable: staff chase no-shows from a phone, and a
+                        // number you can't dial from the list is a number you
+                        // have to retype.
+                        <a
+                          href={`tel:${person.phone}`}
+                          className="text-[13px] whitespace-nowrap text-cream/70 tabular-nums underline decoration-cream/20 underline-offset-2 transition hover:text-gold hover:decoration-gold/50"
+                        >
+                          {formatPhone(person.phone)}
+                        </a>
+                      ) : (
+                        <span className="text-[13px] text-cream/25">—</span>
+                      )}
+                    </td>
+                    <td className="hidden px-3 py-2.5 align-top font-[family-name:var(--font-oswald)] text-[12.5px] text-cream/45 tabular-nums lg:table-cell">
                       {person.ticketRef}
                     </td>
                     <td className="hidden max-w-[1px] truncate px-3 py-2.5 align-top text-[12.5px] lg:table-cell">

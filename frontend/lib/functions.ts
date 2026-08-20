@@ -8,6 +8,7 @@ import type {
   RegisterForEventResult,
   CheckInResult,
   UndoCheckInResult,
+  SelfCheckinMatch,
 } from "./types";
 import type { RosterEntry } from "./offlineStore";
 
@@ -200,6 +201,30 @@ export async function triggerManualReminder(input: {
   resend?: boolean;
 }): Promise<ReminderResult> {
   const call = httpsCallable<typeof input, ReminderResult>(functions, "triggerManualReminder");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function searchSelfCheckin(input: {
+  eventId: string;
+  query: string;
+}): Promise<{ matches: SelfCheckinMatch[]; needsMoreTyping: boolean }> {
+  const call = httpsCallable<
+    typeof input,
+    { matches: SelfCheckinMatch[]; needsMoreTyping: boolean }
+  >(functions, "searchSelfCheckin");
+  const { data } = await call(input);
+  return data;
+}
+
+export async function selfCheckIn(input: {
+  eventId: string;
+  key: string;
+}): Promise<{ outcome: "checked_in" | "already_checked_in"; name: string }> {
+  const call = httpsCallable<
+    typeof input,
+    { outcome: "checked_in" | "already_checked_in"; name: string }
+  >(functions, "selfCheckIn");
   const { data } = await call(input);
   return data;
 }

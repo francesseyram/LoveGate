@@ -102,6 +102,8 @@ export interface CategoryBucket {
 export interface DashboardAttendee extends RegistrationSummary {
   registeredAt: string;
   invitedBy: string;
+  /** Dashboard-only — deliberately absent from the check-in desk's payload. */
+  phone: string;
 }
 
 export interface Dashboard {
@@ -119,4 +121,13 @@ export interface Dashboard {
   inviters: CategoryBucket[];
   attendees: DashboardAttendee[];
   generatedAt: string;
+}
+
+/** One row on the public self check-in page. Deliberately narrow — see backend/src/selfCheckin.ts. */
+export interface SelfCheckinMatch {
+  key: string;
+  name: string;
+  campus: string;
+  maskedPhone: string;
+  alreadyCheckedIn: boolean;
 }

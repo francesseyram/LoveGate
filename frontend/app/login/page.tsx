@@ -22,6 +22,41 @@ const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
 });
 
+/** Open eye — shown while the password is hidden, i.e. "tap to reveal". */
+function EyeIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+/** Struck-through eye — shown while the password is visible, i.e. "tap to hide". */
+function EyeOffIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M9.9 5.7A9.8 9.8 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17.6 17.6 0 0 1-3.3 4.2M6.5 7.8A17.4 17.4 0 0 0 2.5 12S6 18.5 12 18.5a9.6 9.6 0 0 0 4-.85"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9.9 9.9a3 3 0 0 0 4.2 4.2"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path d="m4 4 16 16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function GateMark({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className}>
@@ -57,6 +92,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Staff are handed long passwords and often type them on a phone, where a
+  // masked field means retyping the whole thing after one wrong character.
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   async function handleSubmit(e: FormEvent) {
@@ -173,15 +211,35 @@ export default function LoginPage() {
                 <label className={labelClass} htmlFor="password">
                   Password
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={fieldClass}
-                />
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    // Extra right padding so a long password never runs under
+                    // the toggle.
+                    className={`${fieldClass} pr-12`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((shown) => !shown)}
+                    // The label is the action, not the state — a screen reader
+                    // announcing "hide password" is what the button will do.
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    aria-controls="password"
+                    className="absolute top-2 right-1 flex h-13 w-11 items-center justify-center rounded-lg text-ink/40 transition hover:text-ink/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
+                  >
+                    {showPassword ? (
+                      <EyeOffIcon className="h-[18px] w-[18px]" />
+                    ) : (
+                      <EyeIcon className="h-[18px] w-[18px]" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

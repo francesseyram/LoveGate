@@ -22,15 +22,18 @@ function requireStaff(request: CallableRequest<unknown>): string {
 
 /**
  * The roster row the dashboard table needs: the door's summary, plus signup
- * time and who invited them.
+ * time, who invited them, and a contact number.
  *
  * Widened here rather than in RegistrationSummaryDTO on purpose. The summary is
- * what the check-in desk receives, and the door has no use for a referral — the
- * narrower that payload stays, the less a compromised volunteer login is worth.
+ * what the check-in desk receives, and the door has no use for a referral or a
+ * phone number — the narrower that payload stays, the less a compromised
+ * volunteer login is worth. Organisers running this page do need to reach
+ * people, so the number is carried on this DTO alone.
  */
 export interface DashboardAttendeeDTO extends RegistrationSummaryDTO {
   registeredAt: string;
   invitedBy: string;
+  phone: string;
 }
 
 export interface DashboardDTO {
@@ -113,6 +116,7 @@ export const getEventDashboard = onCall<{ eventId: string }>(async (request) => 
       registeredAt: registeredAt ? registeredAt.toISOString() : "",
       // Absent on anything registered before the field existed.
       invitedBy: data.invitedBy ?? "",
+      phone: data.phone ?? "",
     });
   }
 

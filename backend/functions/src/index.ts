@@ -17,6 +17,7 @@ export { checkInByQr, checkInByRegistrationId, undoCheckIn, searchRegistrations 
 export { getEventSettings, setEventAutoCheckIn } from "./eventSettings";
 export { getEventRoster, getEventStats, syncCheckIns } from "./roster";
 export { getEventDashboard, deleteRegistration } from "./dashboard";
+export { searchSelfCheckin, selfCheckIn } from "./selfCheckin";
 export {
   sendUpcomingReminders,
   triggerManualReminder,
