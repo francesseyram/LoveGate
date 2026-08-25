@@ -79,7 +79,7 @@ function zonedYmd(date: Date): [number, number, number] {
   return [n("year"), n("month"), n("day")];
 }
 
-function isTomorrow(startsAt: Date, now = new Date()): boolean {
+export function isTomorrow(startsAt: Date, now = new Date()): boolean {
   const [year, month, day] = zonedYmd(now);
   const tomorrow = new Date(Date.UTC(year, month - 1, day + 1));
   const [eventYear, eventMonth, eventDay] = zonedYmd(startsAt);
@@ -88,6 +88,19 @@ function isTomorrow(startsAt: Date, now = new Date()): boolean {
     eventMonth === tomorrow.getUTCMonth() + 1 &&
     eventDay === tomorrow.getUTCDate()
   );
+}
+
+/**
+ * Event day. Drives the "happening now" wording used by the blast staff send
+ * on the night, and it's derived rather than passed in for the same reason
+ * `isTomorrow` is: the scheduled 24-hour reminder and the manual blast share
+ * one template, so hardcoding "happening now" would make every future
+ * day-before email lie about the timing.
+ */
+export function isToday(startsAt: Date, now = new Date()): boolean {
+  const [year, month, day] = zonedYmd(now);
+  const [eventYear, eventMonth, eventDay] = zonedYmd(startsAt);
+  return eventYear === year && eventMonth === month && eventDay === day;
 }
 
 function venuePlain(event: EventDoc): string {
@@ -575,6 +588,7 @@ export async function sendReminderEmail(params: {
   const startsAt = event.startsAt.toDate();
   const flyer = await fetchFlyer(event);
   const firstName = attendeeName.trim().split(/\s+/)[0] || attendeeName;
+  const today = isToday(startsAt);
   const tomorrow = isTomorrow(startsAt);
 
   const attachments: NonNullable<CreateEmailOptions["attachments"]> = [
@@ -600,13 +614,19 @@ export async function sendReminderEmail(params: {
   await send({
     from: RESEND_FROM_EMAIL.value(),
     to,
-    subject: tomorrow
-      ? `Tomorrow: ${event.name} at ${formatTimePart(startsAt)}`
-      : `Reminder: ${event.name} on ${formatDatePart(startsAt)}`,
+    subject: today
+      ? `${event.name} is happening now`
+      : tomorrow
+        ? `Tomorrow: ${event.name} at ${formatTimePart(startsAt)}`
+        : `Reminder: ${event.name} on ${formatDatePart(startsAt)}`,
     text: plainText([
       `Hi ${firstName},`,
       ``,
-      tomorrow ? `${event.name} is tomorrow.` : `${event.name} is coming up.`,
+      today
+        ? `${event.name} is happening today at ${formatTimePart(startsAt)}.`
+        : tomorrow
+          ? `${event.name} is tomorrow.`
+          : `${event.name} is coming up.`,
       ``,
       `When: ${formatEventDate(startsAt)}${venuePlain(event)}`,
       ticketRef ? `Ticket: ${ticketRef}` : null,
@@ -615,12 +635,18 @@ export async function sendReminderEmail(params: {
       `brightness turned up so it scans first time.`,
     ]),
     html: shell({
-      preheader: tomorrow
-        ? `${event.name} is tomorrow at ${formatTimePart(startsAt)}. Your ticket is inside.`
-        : `${event.name} is on ${formatDatePart(startsAt)} at ${formatTimePart(startsAt)}. Your ticket is inside.`,
-      eyebrow: tomorrow ? "Happening tomorrow" : "Coming up",
+      preheader: today
+        ? `${event.name} starts at ${formatTimePart(startsAt)} today. Your ticket is inside.`
+        : tomorrow
+          ? `${event.name} is tomorrow at ${formatTimePart(startsAt)}. Your ticket is inside.`
+          : `${event.name} is on ${formatDatePart(startsAt)} at ${formatTimePart(startsAt)}. Your ticket is inside.`,
+      eyebrow: today ? "Happening now" : tomorrow ? "Happening tomorrow" : "Coming up",
       eyebrowColor: GOLD,
-      heading: tomorrow ? `${event.name} is tomorrow` : `${event.name} is coming up`,
+      heading: today
+        ? `${event.name} is happening now`
+        : tomorrow
+          ? `${event.name} is tomorrow`
+          : `${event.name} is coming up`,
       body: [
         detailsBlock(event),
         paragraph(

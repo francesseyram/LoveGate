@@ -112,11 +112,11 @@ export default function SelfCheckinPage() {
 
   return (
     <main
-      className={`${anton.variable} ${oswald.variable} relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
+      className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
     >
       <FireBackground />
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-lg flex-col px-5 py-10">
+      <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-lg flex-col px-5 pt-10 pb-[max(2.5rem,calc(env(safe-area-inset-bottom)+1.5rem))]">
         {done ? (
           <Confirmation done={done} onAgain={() => { setDone(null); setQuery(""); }} />
         ) : (
@@ -203,12 +203,51 @@ export default function SelfCheckinPage() {
                 ) : searched ? (
                   <NoMatch />
                 ) : null}
+
+                {/* The list can be full of people and still not contain you.
+                    Sits directly under the last row because that is where the
+                    eye already is after reading the list — a link back up in
+                    the header would never be found. */}
+                {matches.length > 0 && <NoneOfThese />}
+              </div>
+            )}
+
+            {/* Someone who already knows they never registered shouldn't have
+                to type a name that won't be found just to reach the link. Kept
+                quiet, and hidden once either card above is showing its own. */}
+            {!typedEnough && (
+              <div className="mt-auto pt-10 text-center">
+                <a
+                  href={REGISTER_URL}
+                  className="inline-block text-[14px] text-cream/45 underline decoration-cream/25 underline-offset-4 transition hover:text-gold hover:decoration-gold/50"
+                >
+                  Never registered? Register here
+                </a>
               </div>
             )}
           </>
         )}
       </div>
     </main>
+  );
+}
+
+/** Escape hatch for "the list is showing, but none of these people are me". */
+function NoneOfThese() {
+  return (
+    <div className="mt-5 rounded-2xl border border-dashed border-cream/20 px-5 py-5 text-center">
+      <p className="text-[15px] font-semibold text-cream">None of these are me</p>
+      <p className="mx-auto mt-1.5 max-w-[34ch] text-[13.5px] leading-relaxed text-cream/50">
+        Try your other name first — some people are listed by surname. If you&apos;ve never
+        registered, do that instead.
+      </p>
+      <a
+        href={REGISTER_URL}
+        className="mt-4 inline-block rounded-full bg-[linear-gradient(135deg,#D9A441,#B23A48)] px-6 py-3 text-[14px] font-bold tracking-wide text-[#1A0D0A] uppercase"
+      >
+        Register instead
+      </a>
+    </div>
   );
 }
 
