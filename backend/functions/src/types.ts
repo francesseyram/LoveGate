@@ -74,6 +74,8 @@ export interface RegistrationDoc {
   revertedAt?: Timestamp | null;
   /** Set only after a confirmed reminder send — the per-person idempotency key. */
   remindedAt?: Timestamp | null;
+  /** Same, for the after-the-event thank-you blast — see thanks.ts. */
+  thankedAt?: Timestamp | null;
   /** "self_checkin" when the row was created at the door, absent when registered normally. */
   source?: string;
   /** Links back to member_db when this row was raised from a member record. */

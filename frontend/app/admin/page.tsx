@@ -18,9 +18,10 @@ import {
   deleteRegistration,
   getCallableErrorMessage,
   getEventDashboard,
-  getPublishedEvents,
+  getStaffEvents,
 } from "@/lib/functions";
 import { revertCheckIn } from "@/lib/revertCheckIn";
+import { sortStaffEvents } from "@/lib/eventWindow";
 import type { Dashboard, DashboardAttendee, EventSummary } from "@/lib/types";
 
 /**
@@ -570,7 +571,7 @@ function DashboardTool() {
     let active = true;
     void (async () => {
       try {
-        const list = await getPublishedEvents();
+        const list = sortStaffEvents(await getStaffEvents());
         if (!active) return;
         setEvents(list);
         if (list.length > 0) setEventId(list[0].id);

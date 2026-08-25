@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus_Jakarta_Sans } from "next/font/google";
-import { getPublishedEvents, getCallableErrorMessage } from "@/lib/functions";
+import { Anton, IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { PastEventStub } from "@/components/PastEventStub";
+import { getPastEvents, getPublishedEvents, getCallableErrorMessage } from "@/lib/functions";
 import type { EventSummary } from "@/lib/types";
 
 /**
@@ -22,6 +23,23 @@ const jakarta = Plus_Jakarta_Sans({
   weight: ["400", "500", "600", "700", "800"],
   subsets: ["latin"],
 });
+
+/**
+ * The archive band's own two faces, borrowed from the event pages rather than
+ * the homepage's. Below the fold this page stops being a product surface and
+ * becomes a shelf of finished events, and it should look like it belongs to
+ * them — Anton is what every flyer is set in, and the mono is what a stub is
+ * printed with.
+ */
+const anton = Anton({ variable: "--font-anton", weight: "400", subsets: ["latin"] });
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  weight: ["400", "500"],
+  subsets: ["latin"],
+});
+
+/** How many stubs the homepage shows before sending people to the full archive. */
+const ARCHIVE_PREVIEW = 4;
 
 /**
  * The data model has no `endsAt`, so "still on" is an assumption: an event
@@ -588,6 +606,89 @@ function GoodToKnow({ event }: { event?: EventSummary }) {
 }
 
 /* -------------------------------------------------------------------------
+   Archive
+   ---------------------------------------------------------------------- */
+
+/**
+ * What has already happened, below everything that hasn't.
+ *
+ * Full-bleed and dark against the light page, because it is a different kind
+ * of thing: nothing in it can be acted on. That break is doing the work a
+ * "Past events" heading alone wouldn't — you can tell where the live part of
+ * the page ends without reading a word. Rendered only when there is something
+ * in it; an empty archive is not worth a band.
+ *
+ * The layout follows the count rather than fixing one shape, because Love Inc
+ * has run one gathering, not twenty, and a row built for twenty reads as
+ * broken when it holds one.
+ */
+function Archive({ events }: { events: EventSummary[] }) {
+  if (events.length === 0) return null;
+
+  const shown = events.slice(0, ARCHIVE_PREVIEW);
+  // One or two stubs do not make a shelf. Below that count the heading moves
+  // alongside them instead of sitting on top of a mostly empty row, which is
+  // what a four-column grid looks like when three of the columns are air.
+  const alongside = shown.length <= 2;
+
+  return (
+    <section className="bg-[#0D0705] text-cream">
+      <div
+        className={`mx-auto max-w-[1240px] px-5 py-16 sm:px-8 sm:py-20 ${
+          alongside ? "lg:flex lg:items-center lg:gap-16" : ""
+        }`}
+      >
+        <div className={alongside ? "lg:flex-1" : ""}>
+          <p className="font-[family-name:var(--font-plex-mono)] text-[11.5px] tracking-[0.16em] text-gold/75 uppercase">
+            The archive
+          </p>
+          <h2 className="mt-2.5 font-[family-name:var(--font-anton)] text-[clamp(34px,7vw,58px)] leading-[0.92] tracking-[-0.015em] text-cream uppercase">
+            Already happened
+          </h2>
+          <p className="mt-3.5 max-w-[46ch] text-[15.5px] leading-relaxed text-cream/50">
+            Every gathering is kept here once it&rsquo;s over — the flyer, the date, and where it
+            was.
+          </p>
+          <Link
+            href="/events"
+            className="group mt-4 inline-flex min-h-11 items-center rounded font-[family-name:var(--font-plex-mono)] text-[12px] tracking-[0.08em] text-cream/45 uppercase transition hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold"
+          >
+            All gatherings
+            <span
+              aria-hidden
+              className="ml-2 transition group-hover:translate-x-0.5 motion-reduce:transition-none"
+            >
+              &rarr;
+            </span>
+          </Link>
+        </div>
+
+        {/* Wrapping row rather than a grid: a grid gives every column a share
+            of the width whether or not anything is in it. These widths are
+            fixed fractions of the row, so the stubs fill the line they are on
+            however many there are. */}
+        <ul
+          className={`mt-8 flex flex-wrap gap-5 sm:mt-10 ${
+            alongside ? "lg:mt-0 lg:w-auto lg:flex-none" : ""
+          }`}
+        >
+          {shown.map((event) => (
+            <li
+              key={event.id}
+              className={`w-full sm:w-[calc(50%-10px)] ${
+                alongside ? "lg:w-[286px]" : "lg:w-[calc(25%-15px)]"
+              }`}
+            >
+              <PastEventStub event={event} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------
    States
    ---------------------------------------------------------------------- */
 
@@ -635,6 +736,7 @@ function HeroSkeleton() {
 
 export default function HomePage() {
   const [events, setEvents] = useState<EventSummary[] | null>(null);
+  const [past, setPast] = useState<EventSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const fetchEvents = useCallback(() => {
@@ -647,6 +749,15 @@ export default function HomePage() {
     fetchEvents();
   }, [fetchEvents]);
 
+  // The archive is separate from the retry path above on purpose: it is
+  // supporting material, and a page that can show what's on next should not
+  // be replaced by an error because the shelf underneath it failed to load.
+  useEffect(() => {
+    getPastEvents()
+      .then(setPast)
+      .catch(() => setPast([]));
+  }, []);
+
   function retry() {
     setError(null);
     setEvents(null);
@@ -657,7 +768,7 @@ export default function HomePage() {
 
   return (
     <div
-      className={`${jakarta.variable} min-h-[100svh] bg-canvas font-[family-name:var(--font-plus-jakarta)] text-ink`}
+      className={`${jakarta.variable} ${anton.variable} ${plexMono.variable} min-h-[100svh] bg-canvas font-[family-name:var(--font-plus-jakarta)] text-ink`}
     >
       <header className="absolute inset-x-0 top-0 z-30">
         <div className="mx-auto flex max-w-[1240px] items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-4 sm:px-8 sm:pt-5 sm:pb-5">
@@ -713,6 +824,8 @@ export default function HomePage() {
           {featured && <OtherEvents events={rest} />}
           <GoodToKnow event={featured} />
         </div>
+
+        <Archive events={past} />
       </main>
 
       <footer className="bg-[#120807] text-cream">

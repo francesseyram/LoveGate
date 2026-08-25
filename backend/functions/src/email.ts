@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import type { CreateEmailOptions } from "resend";
 import * as logger from "firebase-functions/logger";
 import { RESEND_FROM_EMAIL, SITE_URL } from "./secrets";
+import { SOCIAL_LINKS } from "./socials";
 import type { EventDoc } from "./types";
 
 let resendClient: Resend | null = null;
@@ -399,17 +400,75 @@ function ticketBlock(params: { ticketRef?: string; caption: string }): string {
             </tr>`;
 }
 
-function ticketLinkBlock(event: EventDoc): string {
-  const site = SITE_URL.value().replace(/\/$/, "");
-  if (!site) return "";
-  const url = `${site}/events/${encodeURIComponent(event.slug)}`;
+function ctaBlock(url: string, label: string): string {
   return `
             <tr>
               <td align="center" class="gutter" style="${gutter("20px")}padding-bottom:0;">
                 <a href="${escapeHtml(url)}" class="cta"
                    style="display:inline-block;background:${CORAL};color:#ffffff;font-size:15.5px;font-weight:700;text-decoration:none;padding:15px 26px;border-radius:999px;text-align:center;">
-                  View the event page
+                  ${escapeHtml(label)}
                 </a>
+              </td>
+            </tr>`;
+}
+
+/** Absolute URL of an event's own page, or null when SITE_URL is unset. */
+function eventUrl(event: EventDoc): string | null {
+  const site = SITE_URL.value().replace(/\/$/, "");
+  if (!site) return null;
+  return `${site}/events/${encodeURIComponent(event.slug)}`;
+}
+
+function ticketLinkBlock(event: EventDoc): string {
+  const url = eventUrl(event);
+  return url ? ctaBlock(url, "View the event page") : "";
+}
+
+/* -------------------------------------------------------------------------
+   Socials
+   ---------------------------------------------------------------------- */
+
+/**
+ * Where to find Love Inc between gatherings.
+ *
+ * One link per row rather than three buttons side by side: a row gives the
+ * handle room to sit under the platform name, and it is already the full width
+ * of the card on a phone, where three inline pills would either wrap raggedly
+ * or shrink below a thumb. The arrow is decoration on its own cell — making it
+ * a second link to the same place would read the destination out twice.
+ */
+function socialsBlock(): string {
+  const rows = SOCIAL_LINKS.map(
+    (social, index) => `
+                  <tr>
+                    <td style="padding:13px 18px;${index > 0 ? `border-top:1px solid #E9E2D7;` : ""}">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td>
+                            <a href="${escapeHtml(social.url)}"
+                               style="font-size:15.5px;font-weight:700;color:${INK};text-decoration:none;">
+                              ${escapeHtml(social.platform)}
+                            </a>
+                            <div style="margin-top:2px;font-size:13.5px;color:rgba(25,21,18,0.5);">
+                              ${escapeHtml(social.handle)}
+                            </div>
+                          </td>
+                          <td align="right" width="24" style="font-size:15px;font-weight:700;color:${CORAL};">&rarr;</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>`
+  ).join("");
+
+  return `
+            <tr>
+              <td class="gutter" style="${gutter("20px")}padding-bottom:0;">
+                <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(25,21,18,0.4);">
+                  Follow Love Inc
+                </div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                       style="margin-top:10px;background:${CANVAS};border:1px solid #E9E2D7;border-radius:12px;">${rows}
+                </table>
               </td>
             </tr>`;
 }
@@ -572,6 +631,79 @@ export async function sendReminderEmail(params: {
         ticketLinkBlock(event),
       ].join(""),
       footerNote: "Can't make it any more? No action needed, just don't check in.",
+    }),
+    attachments,
+  });
+}
+
+/* -------------------------------------------------------------------------
+   Thank-you — sent once, after the event
+   ---------------------------------------------------------------------- */
+
+/**
+ * The note that closes an event out.
+ *
+ * Goes to everyone who registered, which means it is read both by someone who
+ * stood in that room and by someone who signed up and never made it — so the
+ * copy thanks people for being part of it without ever claiming they were
+ * there, and the thing it actually asks for (follow us) is true for both.
+ *
+ * Structurally it is the confirmation run backwards: the flyer leads again,
+ * because at this point the artwork is the only part worth keeping, and where
+ * the ticket used to sit there is now the one link that still goes somewhere.
+ * No QR — the ticket is spent, and attaching a dead one would invite someone
+ * to turn up at a door that isn't open.
+ */
+export async function sendThankYouEmail(params: {
+  to: string;
+  attendeeName: string;
+  event: EventDoc;
+}): Promise<void> {
+  const { to, attendeeName, event } = params;
+  // A blast, not the registration hot path, so this can wait for the artwork.
+  const flyer = await fetchFlyer(event);
+  const firstName = attendeeName.trim().split(/\s+/)[0] || attendeeName;
+  const url = eventUrl(event);
+
+  const attachments: NonNullable<CreateEmailOptions["attachments"]> = [];
+  if (flyer) {
+    attachments.push({ filename: flyerFilename(event), content: flyer, contentId: "event-flyer" });
+  }
+
+  await send({
+    from: RESEND_FROM_EMAIL.value(),
+    to,
+    subject: `That was ${event.name}`,
+    text: plainText([
+      `Hi ${firstName},`,
+      ``,
+      `${event.name} is done. Thank you for being part of it.`,
+      ``,
+      `A gathering ends, the family doesn't. Here's where Love Inc is`,
+      `between events:`,
+      ``,
+      ...SOCIAL_LINKS.map((social) => `${social.platform} (${social.handle}): ${social.url}`),
+      ``,
+      url ? `Look back at the event: ${url}` : null,
+      ``,
+      `The next one shows up on LoveGate first. See you there.`,
+    ]),
+    html: shell({
+      preheader: `Thank you for being part of it. Here's where to find Love Inc between gatherings.`,
+      eyebrow: "Until next time",
+      eyebrowColor: GOLD,
+      heading: `That was ${event.name}`,
+      body: [
+        flyerBlock(Boolean(flyer), event),
+        paragraph(
+          `Hi ${escapeHtml(firstName)}, that's ${escapeHtml(event.name)} done. Thank you for being part of it.`
+        ),
+        paragraph(`A gathering ends, the family doesn't. Here's where we are in the meantime.`),
+        socialsBlock(),
+        url ? ctaBlock(url, "Look back at the event") : "",
+      ].join(""),
+      footerNote:
+        "No ticket this time, just a thank you. The next gathering is announced on LoveGate first.",
     }),
     attachments,
   });

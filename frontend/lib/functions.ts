@@ -45,6 +45,23 @@ export async function getPublishedEvents(): Promise<EventSummary[]> {
   return data.events;
 }
 
+/** The archive: published events far enough past to have finished. Public. */
+export async function getPastEvents(): Promise<EventSummary[]> {
+  const call = httpsCallable<void, { events: EventSummary[] }>(functions, "getPastEvents");
+  const { data } = await call();
+  return data.events;
+}
+
+/**
+ * Every published event including finished ones, for the staff picker.
+ * Staff-only — the public lists stay filtered by date.
+ */
+export async function getStaffEvents(): Promise<EventSummary[]> {
+  const call = httpsCallable<void, { events: EventSummary[] }>(functions, "getStaffEvents");
+  const { data } = await call();
+  return data.events;
+}
+
 export async function getEvent(slug: string): Promise<EventSummary> {
   const call = httpsCallable<{ slug: string }, { event: EventSummary }>(functions, "getEvent");
   const { data } = await call({ slug });
@@ -225,6 +242,45 @@ export async function selfCheckIn(input: {
     typeof input,
     { outcome: "checked_in" | "already_checked_in"; name: string }
   >(functions, "selfCheckIn");
+  const { data } = await call(input);
+  return data;
+}
+
+/* -------------------------------------------------------------------------
+   Thank-you blast — mirrors backend/functions/src/thanks.ts
+   ---------------------------------------------------------------------- */
+
+export interface ThankYouRecipients {
+  /** Registrations that can actually be emailed. */
+  total: number;
+  /** Registered but with no address on file — self check-ins raised from a member record. */
+  noEmail: number;
+  alreadyThanked: number;
+  willReceive: number;
+}
+
+export interface ThankYouResult {
+  sent: number;
+  skipped: number;
+  failed: number;
+}
+
+export async function getThankYouRecipientCount(input: {
+  eventId: string;
+}): Promise<ThankYouRecipients> {
+  const call = httpsCallable<typeof input, ThankYouRecipients>(
+    functions,
+    "getThankYouRecipientCount"
+  );
+  const { data } = await call(input);
+  return data;
+}
+
+export async function sendEventThankYou(input: {
+  eventId: string;
+  resend?: boolean;
+}): Promise<ThankYouResult> {
+  const call = httpsCallable<typeof input, ThankYouResult>(functions, "sendEventThankYou");
   const { data } = await call(input);
   return data;
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
+import { splitByWindow } from "@/lib/eventWindow";
 import type { EventSummary } from "@/lib/types";
 
 /**
@@ -24,6 +25,7 @@ const TABS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/checkin", label: "Check-in" },
   { href: "/admin/reminders", label: "Reminders" },
+  { href: "/admin/thank-you", label: "Thank-you" },
 ];
 
 function GateMark({ className = "" }: { className?: string }) {
@@ -54,6 +56,12 @@ export function StaffNav({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+
+  const { current, past } = splitByWindow(events);
+  const groups = [
+    { label: "Happening now", events: current },
+    { label: "Finished", events: past },
+  ].filter((group) => group.events.length > 0);
 
   async function handleSignOut() {
     await signOut(auth);
@@ -111,10 +119,17 @@ export function StaffNav({
               aria-label="Event"
               className="h-10 max-w-[46vw] truncate rounded-lg border border-gold/35 bg-cream/[0.06] px-3 font-sans text-[16px] text-cream outline-none focus:border-gold sm:max-w-none"
             >
-              {events.map((event) => (
-                <option key={event.id} value={event.id} className="bg-[#22090a] text-cream">
-                  {event.name}
-                </option>
+              {/* Grouped so a finished event can't be mistaken for tonight's.
+                  The picker now carries the whole history — without the split,
+                  choosing the right one would mean knowing the dates by heart. */}
+              {groups.map((group) => (
+                <optgroup key={group.label} label={group.label} className="bg-[#22090a]">
+                  {group.events.map((event) => (
+                    <option key={event.id} value={event.id} className="bg-[#22090a] text-cream">
+                      {event.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           )}

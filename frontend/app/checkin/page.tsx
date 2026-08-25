@@ -7,7 +7,8 @@ import { CheckinScanner } from "@/components/CheckinScanner";
 import { CheckinSearch } from "@/components/CheckinSearch";
 import { FireBackground } from "@/components/FireBackground";
 import { StaffNav } from "@/components/StaffNav";
-import { getPublishedEvents } from "@/lib/functions";
+import { getStaffEvents } from "@/lib/functions";
+import { sortStaffEvents } from "@/lib/eventWindow";
 import { useOfflineCheckin, type CheckinOutcome } from "@/lib/useOfflineCheckin";
 import type { RosterEntry } from "@/lib/offlineStore";
 import type { EventSummary } from "@/lib/types";
@@ -217,7 +218,8 @@ function CheckinTool() {
   const isDesktop = useIsDesktop();
 
   useEffect(() => {
-    getPublishedEvents().then((list) => {
+    getStaffEvents().then((events) => {
+      const list = sortStaffEvents(events);
       setEvents(list);
       if (list.length > 0) setEventId(list[0].id);
     });

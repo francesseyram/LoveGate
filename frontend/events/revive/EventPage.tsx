@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Anton, Oswald } from "next/font/google";
-import { getEvent, getCallableErrorMessage } from "@/lib/functions";
 import type { EventSummary } from "@/lib/types";
 import { RegistrationForm } from "@/components/RegistrationForm";
 import { FireBackground } from "@/components/FireBackground";
@@ -14,8 +12,6 @@ const oswald = Oswald({
   weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
 });
-
-const SLUG = "revive";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -30,33 +26,12 @@ function formatTime(iso: string): string {
  * swap the theme (colors, cover art, copy) — the registration mechanics
  * (validation, duplicate check, QR + email) live in RegistrationForm and
  * don't change per event.
+ *
+ * The event arrives resolved from `EventGate`, which fetches it, handles the
+ * loading and error states, and sends finished events to the archive view
+ * instead. This page only ever draws an event that is still open.
  */
-export default function ReviveEventPage() {
-  const [event, setEvent] = useState<EventSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getEvent(SLUG)
-      .then(setEvent)
-      .catch((err) => setError(getCallableErrorMessage(err)));
-  }, []);
-
-  if (error) {
-    return (
-      <main className="flex min-h-[100svh] items-center justify-center bg-[#0D0705] px-6 text-center text-[#FBF3E7]">
-        <p>{error}</p>
-      </main>
-    );
-  }
-
-  if (!event) {
-    return (
-      <main className="flex min-h-[100svh] items-center justify-center bg-[#0D0705] text-sm text-[#FBF3E7]/60">
-        Loading…
-      </main>
-    );
-  }
-
+export default function ReviveEventPage({ event }: { event: EventSummary }) {
   return (
     <div className={`${anton.variable} ${oswald.variable} min-h-[100svh] bg-[#0D0705] font-sans`}>
       <section className="relative flex min-h-[100svh] flex-col items-center overflow-hidden">

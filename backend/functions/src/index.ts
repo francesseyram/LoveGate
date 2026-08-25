@@ -11,13 +11,14 @@ import { setGlobalOptions } from "firebase-functions/v2";
  */
 setGlobalOptions({ region: "europe-west1", maxInstances: 20 });
 
-export { getPublishedEvents, getEvent } from "./events";
+export { getPublishedEvents, getPastEvents, getStaffEvents, getEvent } from "./events";
 export { registerForEvent } from "./registration";
 export { checkInByQr, checkInByRegistrationId, undoCheckIn, searchRegistrations } from "./checkin";
 export { getEventSettings, setEventAutoCheckIn } from "./eventSettings";
 export { getEventRoster, getEventStats, syncCheckIns } from "./roster";
 export { getEventDashboard, deleteRegistration } from "./dashboard";
 export { searchSelfCheckin, selfCheckIn } from "./selfCheckin";
+export { getThankYouRecipientCount, sendEventThankYou } from "./thanks";
 export {
   sendUpcomingReminders,
   triggerManualReminder,

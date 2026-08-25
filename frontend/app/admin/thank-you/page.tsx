@@ -7,21 +7,25 @@ import { FireBackground } from "@/components/FireBackground";
 import { StaffNav } from "@/components/StaffNav";
 import {
   getStaffEvents,
-  getReminderRecipientCount,
-  triggerManualReminder,
+  getThankYouRecipientCount,
+  sendEventThankYou,
   getCallableErrorMessage,
-  type ReminderResult,
+  type ThankYouRecipients,
+  type ThankYouResult,
 } from "@/lib/functions";
-import { sortStaffEvents } from "@/lib/eventWindow";
+import { mostRecentlyStarted, sortStaffEvents } from "@/lib/eventWindow";
+import { SOCIALS } from "@/lib/socials";
 import type { EventSummary } from "@/lib/types";
 
 /**
- * Manual reminder blast.
+ * The thank-you blast, sent by hand once an event is over.
  *
- * Sending mail to a few hundred people is irreversible, so the layout splits
- * the decision from its consequences: controls on the left, and on the right a
- * standing description of exactly what lands in someone's inbox. The operator
- * should never have to remember what the email contains.
+ * Laid out like the reminder tool on purpose — same split of controls from
+ * consequences, same standing description of what lands in an inbox — because
+ * they are the same irreversible action and an operator should not have to
+ * relearn the screen. What differs is stated where it matters: this one goes
+ * to everyone who ever registered, including the people who never turned up,
+ * and it can only be sent after the event has actually started.
  */
 
 const anton = Anton({ variable: "--font-anton", weight: "400", subsets: ["latin"] });
@@ -31,10 +35,23 @@ const oswald = Oswald({
   subsets: ["latin"],
 });
 
-interface Recipients {
-  total: number;
-  alreadyReminded: number;
-  willReceive: number;
+const ACCRA = "Africa/Accra";
+
+function formatWhen(iso?: string): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: ACCRA,
+  });
+}
+
+/** Before the doors open there is nothing to thank anyone for. */
+function hasStarted(event?: EventSummary): boolean {
+  return Boolean(event) && new Date(event!.startsAt).getTime() <= Date.now();
 }
 
 function Stat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
@@ -58,72 +75,9 @@ function Stat({ label, value, accent }: { label: string; value: number; accent?:
   );
 }
 
-function formatWhen(iso?: string): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "Africa/Accra",
-  });
-}
-
-const ACCRA = "Africa/Accra";
-
-function ymdInAccra(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: ACCRA,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function isTomorrowInAccra(startsAt: Date): boolean {
-  const [year, month, day] = ymdInAccra(new Date()).split("-").map(Number);
-  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1));
-  const tomorrowKey = [
-    tomorrow.getUTCFullYear(),
-    String(tomorrow.getUTCMonth() + 1).padStart(2, "0"),
-    String(tomorrow.getUTCDate()).padStart(2, "0"),
-  ].join("-");
-  return ymdInAccra(startsAt) === tomorrowKey;
-}
-
-/** Mirrors what backend/functions/src/email.ts actually builds. */
+/** Mirrors what `sendThankYouEmail` in backend/functions/src/email.ts builds. */
 function EmailPreview({ event }: { event?: EventSummary }) {
-  const startsAt = event ? new Date(event.startsAt) : null;
-  const tomorrow = startsAt ? isTomorrowInAccra(startsAt) : false;
-  const time = startsAt
-    ? startsAt.toLocaleTimeString("en-GB", {
-        hour: "numeric",
-        minute: "2-digit",
-        timeZone: ACCRA,
-      })
-    : "";
-  const date = startsAt
-    ? startsAt.toLocaleString("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: ACCRA,
-      })
-    : "";
-
-  const subject = event
-    ? tomorrow
-      ? `Tomorrow: ${event.name} at ${time}`
-      : `Reminder: ${event.name} on ${date}`
-    : "Reminder: your event";
-
-  const contents = [
-    "Their QR ticket and ticket reference",
-    "The date, time and venue, with a map link",
-    "The event flyer",
-  ];
+  const subject = event ? `That was ${event.name}` : "That was your event";
 
   return (
     <aside className="rounded-2xl border border-cream/12 bg-[#0D0705]/50 p-5">
@@ -139,52 +93,76 @@ function EmailPreview({ event }: { event?: EventSummary }) {
       </div>
 
       <ul className="mt-4 flex flex-col gap-2.5">
-        {contents.map((line) => (
-          <li key={line} className="flex items-start gap-2.5 text-[14px] text-cream/65">
-            <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
-            {line}
-          </li>
-        ))}
+        {["The event flyer", "A short thank-you, by first name", "A link back to the event page"].map(
+          (line) => (
+            <li key={line} className="flex items-start gap-2.5 text-[14px] text-cream/65">
+              <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+              {line}
+            </li>
+          )
+        )}
       </ul>
+
+      <div className="mt-4 rounded-xl border border-cream/10 bg-cream/[0.03] p-4">
+        <p className="font-[family-name:var(--font-oswald)] text-[10px] tracking-[0.14em] text-cream/40 uppercase">
+          And the links to
+        </p>
+        <ul className="mt-2.5 flex flex-col gap-1.5">
+          {SOCIALS.map((social) => (
+            <li key={social.platform} className="flex items-baseline justify-between gap-3">
+              <span className="text-[14px] font-medium text-cream">{social.platform}</span>
+              <span className="truncate text-[12.5px] text-cream/40">{social.handle}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <div className="mt-5 border-t border-cream/10 pt-4">
         <p className="text-[13px] leading-relaxed text-cream/45">
-          A reminder also goes out automatically 24 hours before the event starts. Anyone it has
-          already reached is skipped here unless you tick the re-send box.
+          No ticket and no QR code — the ticket is spent. The wording thanks people for being part
+          of it without claiming they were in the room, because this reaches everyone who
+          registered, not only the ones who arrived.
         </p>
       </div>
     </aside>
   );
 }
 
-function ReminderTool() {
+function ThankYouTool() {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [eventId, setEventId] = useState("");
-  const [recipients, setRecipients] = useState<Recipients | null>(null);
+  const [recipients, setRecipients] = useState<ThankYouRecipients | null>(null);
   const [resend, setResend] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<ReminderResult | null>(null);
+  const [result, setResult] = useState<ThankYouResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const list = sortStaffEvents(await getStaffEvents());
-      setEvents(list);
-      if (list.length > 0) setEventId(list[0].id);
+      try {
+        // Finished events sort last in the picker but are the whole point of
+        // this page, so it opens on the most recent one that has actually run.
+        const list = sortStaffEvents(await getStaffEvents());
+        setEvents(list);
+        const opening = mostRecentlyStarted(list) ?? list[0];
+        if (opening) setEventId(opening.id);
+      } catch (err) {
+        setError(getCallableErrorMessage(err));
+      }
     })();
   }, []);
 
   const loadRecipients = useCallback(async () => {
     if (!eventId) return;
-    const counts = await getReminderRecipientCount({ eventId });
-    setRecipients(counts);
+    setRecipients(await getThankYouRecipientCount({ eventId }));
   }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
     void (async () => {
       try {
+        setRecipients(null);
         await loadRecipients();
       } catch (err) {
         setError(getCallableErrorMessage(err));
@@ -198,7 +176,7 @@ function ReminderTool() {
     setError(null);
     setResult(null);
     try {
-      const res = await triggerManualReminder({ eventId, resend });
+      const res = await sendEventThankYou({ eventId, resend });
       setResult(res);
       setConfirming(false);
       setResend(false);
@@ -210,8 +188,10 @@ function ReminderTool() {
     }
   }
 
+  const selectedEvent = events.find((event) => event.id === eventId);
+  const started = hasStarted(selectedEvent);
   const willReceive = resend ? (recipients?.total ?? 0) : (recipients?.willReceive ?? 0);
-  const selectedEvent = events.find((e) => e.id === eventId);
+  const canSend = Boolean(eventId) && started && willReceive > 0;
 
   return (
     <main
@@ -227,6 +207,7 @@ function ReminderTool() {
             setEventId(next);
             setResult(null);
             setConfirming(false);
+            setResend(false);
           }}
         />
 
@@ -234,7 +215,7 @@ function ReminderTool() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="font-[family-name:var(--font-anton)] text-[clamp(34px,6vw,54px)] leading-[0.95] tracking-[-0.01em] text-cream uppercase">
-                Send reminders
+                Send thank-you
               </h1>
               {selectedEvent && (
                 <p className="mt-1.5 font-[family-name:var(--font-oswald)] text-[13px] tracking-[0.1em] text-cream/50 uppercase">
@@ -247,7 +228,7 @@ function ReminderTool() {
               <div className="flex w-full items-stretch gap-3 lg:max-w-[480px]">
                 <Stat label="Will receive" value={willReceive} accent />
                 <Stat label="Registered" value={recipients.total} />
-                <Stat label="Already sent" value={recipients.alreadyReminded} />
+                <Stat label="Already sent" value={recipients.alreadyThanked} />
               </div>
             )}
           </div>
@@ -258,24 +239,40 @@ function ReminderTool() {
                 Send now
               </h2>
               <p className="mt-3 max-w-[54ch] text-[15px] leading-relaxed text-cream/60">
-                Emails everyone registered for this event their ticket and the event details.
+                Emails everyone who registered for this event a thank-you, the flyer, and where to
+                find Love Inc next.
               </p>
 
-              {recipients && recipients.alreadyReminded > 0 && (
+              {!started && selectedEvent && (
+                <p className="mt-5 rounded-xl border border-gold/35 bg-gold/10 px-4 py-3.5 text-[14px] leading-relaxed text-cream/80">
+                  {selectedEvent.name} hasn&rsquo;t started yet. A thank-you can only go out once
+                  the event has run — pick a finished event from the menu above.
+                </p>
+              )}
+
+              {recipients && recipients.noEmail > 0 && (
+                <p className="mt-5 text-[13px] leading-relaxed text-cream/45">
+                  {recipients.noEmail} {recipients.noEmail === 1 ? "person has" : "people have"} no
+                  email address on file and can&rsquo;t be reached. Those are self check-ins raised
+                  from the membership roster.
+                </p>
+              )}
+
+              {started && recipients && recipients.alreadyThanked > 0 && (
                 <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-cream/12 bg-cream/[0.04] px-4 py-3">
                   <input
                     type="checkbox"
                     checked={resend}
-                    onChange={(e) => {
-                      setResend(e.target.checked);
+                    onChange={(event) => {
+                      setResend(event.target.checked);
                       setConfirming(false);
                     }}
                     className="mt-0.5 h-4 w-4 accent-[#D9A441]"
                   />
                   <span className="text-[13px] leading-relaxed text-cream/70">
-                    Also re-send to the {recipients.alreadyReminded} who already got a reminder.
+                    Also send again to the {recipients.alreadyThanked} who already got one.
                     <span className="block text-cream/45">
-                      Only for something that changed, like a new venue or time.
+                      They will receive a second, identical email.
                     </span>
                   </span>
                 </label>
@@ -284,16 +281,21 @@ function ReminderTool() {
               {!confirming ? (
                 <button
                   onClick={() => setConfirming(true)}
-                  disabled={!eventId || willReceive === 0}
+                  disabled={!canSend}
                   className="mt-6 rounded-xl bg-[linear-gradient(135deg,#D9A441,#B23A48)] px-6 py-3.5 text-[15px] font-bold tracking-wide text-[#1A0D0A] uppercase shadow-[0_12px_24px_-8px_rgba(217,164,65,0.4)] transition hover:brightness-[1.08] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-gold disabled:opacity-40"
                 >
-                  {willReceive === 0 ? "Everyone has been reminded" : `Send to ${willReceive} people`}
+                  {!started
+                    ? "Event hasn't run yet"
+                    : willReceive === 0
+                      ? "Everyone has been thanked"
+                      : `Send to ${willReceive} ${willReceive === 1 ? "person" : "people"}`}
                 </button>
               ) : (
                 <div className="mt-6 rounded-xl border border-gold/45 bg-gold/10 p-5">
                   <p className="text-[15px] text-cream">
-                    Send a reminder email to <strong>{willReceive}</strong>{" "}
-                    {willReceive === 1 ? "person" : "people"} registered for {selectedEvent?.name}?
+                    Send a thank-you email to <strong>{willReceive}</strong>{" "}
+                    {willReceive === 1 ? "person" : "people"} who registered for{" "}
+                    {selectedEvent?.name}?
                   </p>
                   <p className="mt-1.5 text-[13px] text-cream/55">This can&apos;t be undone.</p>
                   <div className="mt-4 flex flex-wrap gap-3">
@@ -319,7 +321,7 @@ function ReminderTool() {
                 <div className="mt-5 rounded-xl border border-sage/35 bg-sage/15 px-4 py-3.5 text-sm text-sage">
                   <p className="flex items-center gap-2 font-medium">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-sage" />
-                    Sent {result.sent} reminder{result.sent === 1 ? "" : "s"}.
+                    Sent {result.sent} thank-you{result.sent === 1 ? "" : "s"}.
                   </p>
                   {(result.skipped > 0 || result.failed > 0) && (
                     <p className="mt-1.5 pl-4 text-[13px] text-sage/80">
@@ -346,10 +348,10 @@ function ReminderTool() {
   );
 }
 
-export default function AdminRemindersPage() {
+export default function AdminThankYouPage() {
   return (
     <AuthGuard>
-      <ReminderTool />
+      <ThankYouTool />
     </AuthGuard>
   );
 }

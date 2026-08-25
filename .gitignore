@@ -3,3 +3,8 @@ CLAUDE.md
 # 1,100 people's phone numbers and email addresses — imported into member_db
 # by scripts/seedMembers.js, never committed.
 backend/data/
+
+# Firebase emulator byproducts, written into backend/functions/ whenever
+# `npm run serve` runs. Nothing in them is worth keeping.
+*-debug.log
+firebase-export-*/
