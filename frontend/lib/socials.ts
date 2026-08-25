@@ -31,6 +31,6 @@ export const SOCIALS: Social[] = [
     platform: "Telegram",
     handle: "Community channel",
     url: "https://t.me/+fdtcpEdq1KdhMGFk",
-    blurb: "Where all Love Inc messages are posted",
+    blurb: "Where all Love Inc me`ssages are posted",
   },
 ];

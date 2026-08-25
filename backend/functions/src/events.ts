@@ -55,8 +55,11 @@ export const getEvent = onCall<{ slug: string }>(async (request) => {
  * Unauthenticated, like the rest of this file: it is the same information the
  * event's own page has always shown to anyone with the link.
  *
- * Served by the existing events(status, startsAt) index, which Firestore reads
- * backwards for the descending order.
+ * Needs its own events(status ASC, startsAt DESC) composite index — Firestore
+ * does NOT reverse-scan the ascending twin that `getPublishedEvents` uses, and
+ * without it every call fails with FAILED_PRECONDITION. The Firestore emulator
+ * does not enforce index requirements, so this only ever shows up in a
+ * deployed environment: don't take a green local run as proof.
  */
 export const getPastEvents = onCall(async () => {
   const snap = await db
@@ -83,6 +86,8 @@ export const getPastEvents = onCall(async () => {
  *
  * Staff-only because it is the one listing that ignores the date filter the
  * public pages rely on to stop finished events advertising themselves.
+ *
+ * Shares the events(status ASC, startsAt DESC) index with `getPastEvents`.
  */
 export const getStaffEvents = onCall(async (request) => {
   if (!request.auth) {
