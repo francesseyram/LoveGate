@@ -6,8 +6,7 @@ import { db } from "./admin";
 import { RESEND_API_KEY } from "./secrets";
 import { generateQrPngBuffer } from "./qr";
 import { sendReminderEmail } from "./email";
-import { buildTicketRef } from "./search";
-import { EventDoc, RegistrationDoc } from "./types";
+import { EventDoc, RegistrationDoc, ticketRefOf } from "./types";
 
 /**
  * Resend allows ~10 requests/second. Staying meaningfully under that keeps the
@@ -54,7 +53,7 @@ async function sendRemindersForEvent(eventId: string, event: EventDoc): Promise<
             attendeeName: registration.name,
             event,
             qrPng,
-            ticketRef: buildTicketRef(doc.id),
+            ticketRef: ticketRefOf(doc.id, registration),
           });
           // Marked only after a confirmed send, so a failure is retried rather
           // than silently skipped next time.

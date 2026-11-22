@@ -8,7 +8,8 @@ import { isEventCurrent } from "./eventWindow";
 import { buildSearchPrefixes, buildTicketRef, registrationDocId } from "./search";
 import { makeQrValue, generateQrPngBuffer, generateQrDataUrl } from "./qr";
 import { sendConfirmationEmail } from "./email";
-import { AUTO_CHECKIN_ACTOR, EventDoc, RegistrationDoc, registrationToDTO } from "./types";
+import { AUTO_CHECKIN_ACTOR, EventDoc, RegistrationDoc, registrationToDTO, ticketRefOf } from "./types";
+import { eventSessions } from "./eventShape";
 
 interface RegisterInput {
   eventId: string;
@@ -20,12 +21,14 @@ interface RegisterInput {
   level: string;
   whatsapp?: string;
   invitedBy?: string;
+  /** The event's companion (see EventDoc.companionSlug), ticked to register for it too. */
+  alsoEventId?: string;
 }
 
 export const registerForEvent = onCall<RegisterInput>(
   { secrets: [RESEND_API_KEY] },
   async (request) => {
-    const { eventId, name, phone, email, dob, school, level, whatsapp, invitedBy } =
+    const { eventId, name, phone, email, dob, school, level, whatsapp, invitedBy, alsoEventId } =
       request.data ?? ({} as RegisterInput);
 
     if (!eventId || typeof eventId !== "string") {
@@ -64,18 +67,20 @@ export const registerForEvent = onCall<RegisterInput>(
     const phoneKey = toPhoneKey(phone ?? "");
     const normalizedWhatsapp = whatsapp?.trim() ? toPhoneKey(whatsapp) : phoneKey;
 
-    const eventSnap = await db.collection("events").doc(eventId).get();
-    if (!eventSnap.exists) {
-      throw new HttpsError("not-found", "Event not found");
-    }
-    const event = eventSnap.data() as EventDoc;
-    if (event.status !== "published") {
-      throw new HttpsError("failed-precondition", "This event is not open for registration");
-    }
-    // Without this, a stale shared link keeps issuing tickets to an event that
-    // already happened.
-    if (!isEventCurrent(event.startsAt)) {
-      throw new HttpsError("failed-precondition", "Registration for this event has closed");
+    const event = await loadOpenEvent(eventId, "This event");
+
+    // The optional second event, ticked on the form. Only ever the companion
+    // this event names, so the form can't be used to sign people up elsewhere.
+    let companion: { id: string; doc: EventDoc } | null = null;
+    if (alsoEventId) {
+      if (typeof alsoEventId !== "string" || alsoEventId === eventId) {
+        throw new HttpsError("invalid-argument", "alsoEventId is invalid");
+      }
+      const doc = await loadOpenEvent(alsoEventId, "The other event");
+      if (!event.companionSlug || doc.slug !== event.companionSlug) {
+        throw new HttpsError("invalid-argument", "These events can't be registered for together");
+      }
+      companion = { id: alsoEventId, doc };
     }
 
     // Late-arrival mode. Once the doors are open, staff flip this on and anyone
@@ -83,18 +88,14 @@ export const registerForEvent = onCall<RegisterInput>(
     // then have to queue up and scan is a queue for nothing. Applies to new
     // registrations only: someone re-opening the form from home to find their
     // ticket again hits the alreadyRegistered path below and is not in the room.
+    // Never applied to the companion: registering for Sunday from the Friday
+    // door is not arriving on Sunday.
     const autoCheckIn = event.autoCheckIn === true;
     const registeredAt = Timestamp.now();
 
-    // Deterministic id keyed on the phone, so a duplicate submit collides in
-    // the database instead of racing a read-then-write check.
-    const docRef = db.collection("registrations").doc(registrationDocId(eventId, phoneKey));
-    const qrValue = makeQrValue(docRef.id);
-    const registration: RegistrationDoc = {
-      eventId,
+    const person = {
       name: trimmedName,
       nameLower: trimmedName.toLowerCase(),
-      searchPrefixes: buildSearchPrefixes(trimmedName, buildTicketRef(docRef.id)),
       phone: normalizedPhone,
       phoneKey,
       email: trimmedEmail,
@@ -103,52 +104,126 @@ export const registerForEvent = onCall<RegisterInput>(
       level: trimmedLevel,
       whatsapp: normalizedWhatsapp,
       invitedBy: trimmedInvitedBy,
-      qrValue,
-      status: autoCheckIn ? "checked_in" : "going",
       registeredAt,
-      checkedInAt: autoCheckIn ? registeredAt : null,
-      checkedInBy: autoCheckIn ? AUTO_CHECKIN_ACTOR : null,
     };
 
-    try {
-      await docRef.create(registration);
-    } catch (err) {
-      // ALREADY_EXISTS — this phone already has a ticket for this event.
-      if ((err as { code?: number }).code === 6) {
-        const existingDoc = await docRef.get();
-        const existing = existingDoc.data() as RegistrationDoc;
-        return {
-          alreadyRegistered: true,
-          registration: registrationToDTO(existingDoc.id, existing),
-          qrImage: await generateQrDataUrl(existing.qrValue),
-        };
+    // Deterministic ids keyed on the phone, so each event holds at most one
+    // registration per person: a duplicate submit, or ticking the companion a
+    // second time, lands on the same document instead of a new one.
+    const registrations = db.collection("registrations");
+    const primaryRef = registrations.doc(registrationDocId(eventId, phoneKey));
+    const companionRef = companion ? registrations.doc(registrationDocId(companion.id, phoneKey)) : null;
+
+    const outcome = await db.runTransaction(async (tx) => {
+      const [primarySnap, companionSnap] = await Promise.all([
+        tx.get(primaryRef),
+        companionRef ? tx.get(companionRef) : Promise.resolve(null),
+      ]);
+      const primaryExisting = primarySnap.exists ? (primarySnap.data() as RegistrationDoc) : null;
+      const companionExisting = companionSnap?.exists ? (companionSnap.data() as RegistrationDoc) : null;
+
+      // One ticket for both. Whichever registration already exists keeps its
+      // QR — it may already be in their inbox — and the new one reuses it.
+      const ticket = primaryExisting
+        ? { qrValue: primaryExisting.qrValue, ticketOf: primaryExisting.ticketOf ?? primaryRef.id }
+        : companionExisting && companionRef
+          ? { qrValue: companionExisting.qrValue, ticketOf: companionExisting.ticketOf ?? companionRef.id }
+          : { qrValue: makeQrValue(primaryRef.id), ticketOf: primaryRef.id };
+
+      const build = (forEventId: string, id: string, checkIn: boolean): RegistrationDoc => ({
+        eventId: forEventId,
+        ...person,
+        searchPrefixes: buildSearchPrefixes(trimmedName, buildTicketRef(ticket.ticketOf)),
+        qrValue: ticket.qrValue,
+        ...(ticket.ticketOf !== id ? { ticketOf: ticket.ticketOf } : {}),
+        status: checkIn ? "checked_in" : "going",
+        checkedInAt: checkIn ? registeredAt : null,
+        checkedInBy: checkIn ? AUTO_CHECKIN_ACTOR : null,
+      });
+
+      const primary = primaryExisting ?? build(eventId, primaryRef.id, autoCheckIn);
+      if (!primaryExisting) tx.create(primaryRef, primary);
+
+      let companionDoc = companionExisting;
+      if (companion && companionRef && !companionExisting) {
+        companionDoc = build(companion.id, companionRef.id, false);
+        tx.create(companionRef, companionDoc);
       }
-      throw err;
-    }
 
-    const qrPng = await generateQrPngBuffer(qrValue);
-    const qrImage = await generateQrDataUrl(qrValue);
+      return {
+        primary,
+        primaryCreated: !primaryExisting,
+        companionDoc,
+        companionCreated: Boolean(companion && !companionExisting),
+      };
+    });
 
-    try {
-      await sendConfirmationEmail({
-        to: trimmedEmail,
-        attendeeName: trimmedName,
-        event,
-        qrPng,
-        ticketRef: buildTicketRef(docRef.id),
-      });
-    } catch (err) {
-      logger.error("Failed to send confirmation email", {
-        eventId,
-        registrationId: docRef.id,
-        err,
-      });
+    const { primary, primaryCreated, companionDoc, companionCreated } = outcome;
+    // False only when both registrations predate this call with different
+    // tickets (they registered for each separately) — then they keep two.
+    const sharesTicket = Boolean(companionDoc && companionDoc.qrValue === primary.qrValue);
+    const qrImage = await generateQrDataUrl(primary.qrValue);
+
+    // A new registration on either side gets the confirmation; re-opening the
+    // form to find a ticket again doesn't re-send it. When the ticket covers
+    // both events, so does the email.
+    if (primaryCreated || companionCreated) {
+      const emailEvent: EventDoc =
+        companion && sharesTicket
+          ? {
+              ...event,
+              name: `${event.name} & ${companion.doc.name}`,
+              sessions: [...eventSessions(event), ...eventSessions(companion.doc)],
+            }
+          : event;
+      try {
+        await sendConfirmationEmail({
+          to: trimmedEmail,
+          attendeeName: trimmedName,
+          event: emailEvent,
+          qrPng: await generateQrPngBuffer(primary.qrValue),
+          ticketRef: ticketRefOf(primaryRef.id, primary),
+        });
+      } catch (err) {
+        logger.error("Failed to send confirmation email", {
+          eventId,
+          registrationId: primaryRef.id,
+          err,
+        });
+      }
     }
 
     return {
-      alreadyRegistered: false,
-      registration: registrationToDTO(docRef.id, registration),
+      alreadyRegistered: !primaryCreated,
+      registration: registrationToDTO(primaryRef.id, primary),
       qrImage,
+      ...(companion && companionDoc && companionRef
+        ? {
+            companion: {
+              eventId: companion.id,
+              alreadyRegistered: !companionCreated,
+              sharesTicket,
+            },
+          }
+        : {}),
     };
   }
 );
+
+/** The event, if it can take registrations right now; otherwise a sentence saying why not. */
+async function loadOpenEvent(id: string, label: string): Promise<EventDoc> {
+  const snap = await db.collection("events").doc(id).get();
+  if (!snap.exists) {
+    throw new HttpsError("not-found", "Event not found");
+  }
+  const event = snap.data() as EventDoc;
+  if (event.status !== "published") {
+    throw new HttpsError("failed-precondition", `${label} is not open for registration`);
+  }
+  // Without this, a stale shared link keeps issuing tickets to an event that
+  // already happened.
+  if (!isEventCurrent(event)) {
+    throw new HttpsError("failed-precondition", `Registration for ${label.toLowerCase()} has closed`);
+  }
+  return event;
+}

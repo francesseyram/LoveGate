@@ -12,7 +12,35 @@ export interface EventSummary {
   /** Map link for the venue, shown wherever the location is. */
   locationUrl?: string;
   status: EventStatus;
+  /**
+   * The gatherings one registration covers — at least one. Optional on the
+   * type only because a backend deployed before sessions existed doesn't send
+   * it; read it through `eventSessions` in lib/eventShape.ts, never directly.
+   */
+  sessions?: EventSession[];
+  /** When the last session starts. Same caveat: read through `eventEndsAt`. */
+  endsAt?: string;
+  chapter?: Chapter;
+  /** Preset for the shared event page — see events/themes.ts. */
+  theme?: string;
+  tagline?: string;
+  /**
+   * Slug of a sister event this one's form offers to register for too, with
+   * one shared ticket (Fire Night ↔ Sunday Service).
+   */
+  companionSlug?: string;
+  /** Google Maps search for the venue (ideally a plus code); drives the page's map. */
+  mapQuery?: string;
 }
+
+export interface EventSession {
+  name: string;
+  startsAt: string;
+  location?: string;
+  locationUrl?: string;
+}
+
+export type Chapter = "global" | "knust";
 
 export interface Registration {
   id: string;
@@ -36,6 +64,13 @@ export interface RegisterForEventResult {
   alreadyRegistered: boolean;
   registration: Registration;
   qrImage: string;
+  /** Present when the companion event was ticked on the form. */
+  companion?: {
+    eventId: string;
+    alreadyRegistered: boolean;
+    /** True when the one ticket above also gets them into the companion event. */
+    sharesTicket: boolean;
+  };
 }
 
 /**

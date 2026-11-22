@@ -1,4 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
+import { eventEndsAt } from "./eventShape";
+import type { EventTiming } from "./eventShape";
 
 /**
  * How long after `startsAt` an event stays "current".
@@ -14,7 +16,11 @@ export function eventCutoff(now: Timestamp = Timestamp.now()): Timestamp {
   return Timestamp.fromMillis(now.toMillis() - EVENT_GRACE_HOURS * 60 * 60 * 1000);
 }
 
-/** False once the event is far enough past that it should stop being offered. */
-export function isEventCurrent(startsAt: Timestamp, now: Timestamp = Timestamp.now()): boolean {
-  return startsAt.toMillis() >= eventCutoff(now).toMillis();
+/**
+ * False once the event is far enough past that it should stop being offered.
+ * Measured from the last session, not the first: an event that runs Friday
+ * and Sunday stays open through Sunday.
+ */
+export function isEventCurrent(event: EventTiming, now: Timestamp = Timestamp.now()): boolean {
+  return eventEndsAt(event).toMillis() >= eventCutoff(now).toMillis();
 }

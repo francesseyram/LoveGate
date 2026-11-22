@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { registerForEvent, getCallableErrorMessage } from "@/lib/functions";
-import type { RegisterForEventResult } from "@/lib/types";
+import type { EventSession, EventSummary, RegisterForEventResult } from "@/lib/types";
+import { dayOf, eventSessions, monthOf, shortWeekdayOf, timeOf } from "@/lib/eventShape";
 import { QRTicket } from "./QRTicket";
 
 const LEVEL_OPTIONS = ["100", "200", "300", "400", "Graduate", "Alumni", "Other"];
@@ -65,6 +66,118 @@ function Field({
   );
 }
 
+/** "Sun 29 Nov · 11:00 AM" */
+function whenOf(session: EventSession): string {
+  return `${shortWeekdayOf(session.startsAt)} ${dayOf(session.startsAt)} ${monthOf(session.startsAt)} · ${timeOf(session.startsAt)}`;
+}
+
+/**
+ * The tick-box for a sister event, with that event's flyer beside it so
+ * nobody signs up for something they haven't seen. Once ticked it spells out
+ * exactly what they're getting: both events, one ticket.
+ */
+function CompanionOptIn({
+  companion,
+  thisEventName,
+  thisWhen,
+  checked,
+  onChange,
+  isRevive,
+}: {
+  companion: EventSummary;
+  thisEventName: string;
+  thisWhen?: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  isRevive: boolean;
+}) {
+  const [flyerFailed, setFlyerFailed] = useState(false);
+  const session = eventSessions(companion)[0];
+  const showFlyer = Boolean(companion.coverPhotoUrl) && !flyerFailed;
+
+  const frame = isRevive
+    ? checked
+      ? "border-gold bg-gold/[0.12]"
+      : "border-gold/30 bg-cream/[0.04] hover:border-gold/60"
+    : checked
+      ? "border-coral bg-coral/[0.06]"
+      : "border-charcoal/15 bg-cream hover:border-coral/50";
+  const ink = isRevive ? "text-cream" : "text-charcoal";
+  const muted = isRevive ? "text-cream/60" : "text-charcoal/60";
+
+  return (
+    <div className="mt-8">
+      <label
+        className={`flex cursor-pointer gap-4 rounded-[14px] border-[1.5px] p-4 font-sans transition sm:gap-5 sm:p-5 ${frame}`}
+      >
+        {showFlyer ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={companion.coverPhotoUrl}
+            alt={`${companion.name} flyer`}
+            onError={() => setFlyerFailed(true)}
+            className="aspect-[4/5] w-[96px] shrink-0 rounded-[8px] object-cover sm:w-[132px]"
+          />
+        ) : (
+          <div
+            aria-hidden
+            className={`flex aspect-[4/5] w-[96px] shrink-0 flex-col items-center justify-center rounded-[8px] sm:w-[132px] ${
+              isRevive
+                ? "bg-[linear-gradient(165deg,#FBE3B4_0%,#F4B46A_55%,#E7804A_100%)] text-[#2A0A0E]"
+                : "bg-coral text-cream"
+            }`}
+          >
+            <span className="text-[11px] font-semibold tracking-[0.16em] uppercase">
+              {shortWeekdayOf(session.startsAt)}
+            </span>
+            <span className="font-[family-name:var(--font-anton)] text-[46px] leading-none sm:text-[56px]">
+              {dayOf(session.startsAt)}
+            </span>
+            <span className="text-[11px] font-semibold tracking-[0.16em] uppercase">{monthOf(session.startsAt)}</span>
+          </div>
+        )}
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className={`text-[12px] font-semibold tracking-[0.14em] uppercase ${isRevive ? "text-gold" : "text-coral-dark"}`}>
+            Also coming to
+          </div>
+          <div className={`mt-1 text-[20px] leading-tight font-semibold sm:text-[22px] ${ink}`}>{companion.name}</div>
+          <div className={`mt-1.5 text-[14px] leading-snug ${muted}`}>
+            {whenOf(session)}
+            {session.location && (
+              <>
+                <br />
+                {session.location}
+              </>
+            )}
+          </div>
+          {companion.description && (
+            <p className={`mt-2 line-clamp-3 text-[13.5px] leading-snug ${muted}`}>{companion.description}</p>
+          )}
+
+          <div className="mt-auto flex items-start gap-3 pt-4">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(e) => onChange(e.target.checked)}
+              className={`mt-0.5 h-5 w-5 shrink-0 ${isRevive ? "accent-[#D9A441]" : "accent-[#B23A48]"}`}
+            />
+            <span className={`text-[15px] leading-snug font-semibold ${ink}`}>
+              Register me for {companion.name} too
+            </span>
+          </div>
+        </div>
+      </label>
+
+      <p aria-live="polite" className={`mt-3 px-1 font-sans text-[13.5px] leading-snug ${muted}`}>
+        {checked
+          ? `You'll be registered for ${thisEventName}${thisWhen ? ` (${thisWhen})` : ""} and ${companion.name} (${whenOf(session)}) with the details above. One ticket gets you into both.`
+          : `Uses the details above. You'll get one ticket that works at both.`}
+      </p>
+    </div>
+  );
+}
+
 /**
  * Shared registration mechanics (validation, duplicate check, QR + email trigger)
  * embedded in every event's custom themed page. `theme` picks the visual skin —
@@ -83,6 +196,8 @@ export function RegistrationForm({
   eventStartsAt,
   eventLocation,
   eventLocationUrl,
+  sessions,
+  companion,
   theme = "neutral",
 }: {
   eventId: string;
@@ -90,6 +205,10 @@ export function RegistrationForm({
   eventStartsAt?: string;
   eventLocation?: string;
   eventLocationUrl?: string;
+  /** Every session the ticket covers; when there's more than one the ticket lists them all. */
+  sessions?: EventSession[];
+  /** A sister event to offer with a tick-box; see `EventSummary.companionSlug`. */
+  companion?: EventSummary;
   theme?: "neutral" | "revive";
 }) {
   const [name, setName] = useState("");
@@ -99,6 +218,7 @@ export function RegistrationForm({
   const [whatsapp, setWhatsapp] = useState("");
   const [invitedBy, setInvitedBy] = useState("");
   const [level, setLevel] = useState("");
+  const [alsoCompanion, setAlsoCompanion] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -154,6 +274,7 @@ export function RegistrationForm({
         level,
         whatsapp: whatsapp.trim() || undefined,
         invitedBy: invitedBy.trim() || undefined,
+        alsoEventId: companion && alsoCompanion ? companion.id : undefined,
       });
       setResult(res);
     } catch (err) {
@@ -171,12 +292,23 @@ export function RegistrationForm({
     setWhatsapp("");
     setInvitedBy("");
     setLevel("");
+    setAlsoCompanion(false);
     setBannerError(null);
     setFieldErrors({});
     setResult(null);
   }
 
   const eventDate = formatEventDate(eventStartsAt);
+
+  // What this event's ticket covers on its own, as sessions.
+  const ownSessions: EventSession[] =
+    sessions ??
+    (eventStartsAt
+      ? [{ name: eventName, startsAt: eventStartsAt, location: eventLocation, locationUrl: eventLocationUrl }]
+      : []);
+  const ticketCoversCompanion = Boolean(companion && result?.companion?.sharesTicket);
+  const ticketSessions =
+    ticketCoversCompanion && companion ? [...ownSessions, ...eventSessions(companion)] : sessions;
   const isRevive = theme === "revive";
 
   // Padding steps up with the viewport instead of starting at 36px. On a 390px
@@ -224,19 +356,29 @@ export function RegistrationForm({
     <div className={cardClass}>
       {result ? (
         <div className="flex flex-col items-center">
-          {result.alreadyRegistered && (
+          {result.alreadyRegistered && !result.companion && (
             <p className={`${alreadyBannerClass} w-full max-w-[420px] text-center`}>
               You&apos;re already registered for this event. Here&apos;s your ticket.
+            </p>
+          )}
+          {result.companion && companion && (
+            <p className={`${alreadyBannerClass} w-full max-w-[420px] text-center`}>
+              {result.companion.sharesTicket
+                ? result.alreadyRegistered && result.companion.alreadyRegistered
+                  ? `You were already registered for ${eventName} and ${companion.name}. This one ticket gets you into both.`
+                  : `You're registered for ${eventName} and ${companion.name}. This one ticket gets you into both.`
+                : `You're registered for both, with a separate ticket for ${companion.name} from when you signed up for it. Check your email for it.`}
             </p>
           )}
           <QRTicket
             theme={theme}
             registration={result.registration}
             qrImage={result.qrImage}
-            eventName={eventName}
+            eventName={ticketCoversCompanion && companion ? `${eventName} + ${companion.name}` : eventName}
             eventStartsAt={eventStartsAt}
             eventLocation={eventLocation}
             eventLocationUrl={eventLocationUrl}
+            sessions={ticketSessions}
           />
           <button
             type="button"
@@ -268,8 +410,9 @@ export function RegistrationForm({
                 : "mb-7 text-[15.5px] text-charcoal/65"
             }
           >
-            {eventName}
-            {eventDate ? ` · ${eventDate}` : ""}
+            {sessions && sessions.length > 1
+              ? sessions.map((session) => session.name).join(" + ")
+              : `${eventName}${eventDate ? ` · ${eventDate}` : ""}`}
           </p>
 
           {bannerError && (
@@ -411,6 +554,17 @@ export function RegistrationForm({
               />
             </Field>
           </div>
+
+          {companion && (
+            <CompanionOptIn
+              companion={companion}
+              thisEventName={eventName}
+              thisWhen={ownSessions[0] ? whenOf(ownSessions[0]) : undefined}
+              checked={alsoCompanion}
+              onChange={setAlsoCompanion}
+              isRevive={isRevive}
+            />
+          )}
 
           <button
             type="submit"

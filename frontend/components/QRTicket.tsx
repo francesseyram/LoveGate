@@ -1,4 +1,4 @@
-import type { Registration } from "@/lib/types";
+import type { EventSession, Registration } from "@/lib/types";
 
 function formatEventDate(iso?: string): string | undefined {
   if (!iso) return undefined;
@@ -63,6 +63,7 @@ export function QRTicket({
   eventStartsAt,
   eventLocation,
   eventLocationUrl,
+  sessions,
 }: {
   theme?: "neutral" | "revive";
   registration: Registration;
@@ -71,6 +72,8 @@ export function QRTicket({
   eventStartsAt?: string;
   eventLocation?: string;
   eventLocationUrl?: string;
+  /** When there's more than one, listed in place of the single date and venue. */
+  sessions?: EventSession[];
 }) {
   const ticketRef = `LG-${registration.id.slice(-6).toUpperCase()}`;
   const eventDate = formatEventDate(eventStartsAt);
@@ -99,6 +102,37 @@ export function QRTicket({
           {registration.name}
         </div>
 
+        {sessions && sessions.length > 1 ? (
+          <ul className="mt-4 flex flex-col gap-3 text-[15px] text-charcoal/70">
+            {sessions.map((session) => (
+              <li key={`${session.name}-${session.startsAt}`} className="flex items-start gap-2.5">
+                <CalendarIcon />
+                <span>
+                  <span className="font-semibold text-charcoal">{session.name}</span>
+                  <br />
+                  {formatEventDate(session.startsAt)} · {formatEventTime(session.startsAt)}
+                  {session.location && (
+                    <>
+                      <br />
+                      {session.locationUrl ? (
+                        <a
+                          href={session.locationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded underline decoration-charcoal/25 underline-offset-2 transition hover:text-charcoal hover:decoration-charcoal/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
+                        >
+                          {session.location}
+                        </a>
+                      ) : (
+                        session.location
+                      )}
+                    </>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
         <div className="mt-4 flex flex-col gap-2.5 text-[15px] text-charcoal/70">
           {eventDate && (
             <div className="flex items-start gap-2.5">
@@ -130,6 +164,7 @@ export function QRTicket({
             </div>
           )}
         </div>
+        )}
       </div>
 
       <div className="relative px-5 sm:px-6">

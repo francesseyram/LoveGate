@@ -1,27 +1,54 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "./admin";
-import { eventCutoff } from "./eventWindow";
+import { Timestamp } from "firebase-admin/firestore";
+import { isEventCurrent } from "./eventWindow";
 import { EventDoc, eventToDTO } from "./types";
+import type { EventDTO } from "./types";
 
 /** Nobody scrolls further back than this, and it bounds an unbounded read. */
 const PAST_EVENTS_LIMIT = 24;
 
 /**
- * Events still worth showing: published, and not yet past the grace window.
- * Without the date filter every event ever run stays on the homepage tagged
- * "Registration open" and piles up in the staff event picker forever.
+ * Every published event, split at the grace-window cutoff by when each one
+ * *ends* (its last session), not when it starts.
+ *
+ * This used to be a Firestore range filter on `startsAt`, which is exactly the
+ * thing that breaks for a multi-session event: Fire Night on Friday with the
+ * Sunday service after it would have been filed as finished on Saturday
+ * morning. The end of an event isn't a stored field Firestore can range over,
+ * and published events number in the dozens, so the split happens here instead
+ * — one indexed read ordered by `startsAt`, then a filter in memory.
+ *
+ * Uses the existing events(status ASC, startsAt DESC) index.
  */
-export const getPublishedEvents = onCall(async () => {
+async function publishedEventsSplit(): Promise<{ current: EventDTO[]; past: EventDTO[] }> {
   const snap = await db
     .collection("events")
     .where("status", "==", "published")
-    .where("startsAt", ">=", eventCutoff())
-    .orderBy("startsAt", "asc")
+    .orderBy("startsAt", "desc")
     .get();
 
-  return {
-    events: snap.docs.map((doc) => eventToDTO(doc.id, doc.data() as EventDoc)),
-  };
+  const now = Timestamp.now();
+  const current: EventDTO[] = [];
+  const past: EventDTO[] = [];
+  for (const doc of snap.docs) {
+    const event = doc.data() as EventDoc;
+    (isEventCurrent(event, now) ? current : past).push(eventToDTO(doc.id, event));
+  }
+  // Snapshot is newest-first: right for the archive, backwards for what's on.
+  current.reverse();
+  return { current, past };
+}
+
+/**
+ * Events still worth showing: published, and not yet past the grace window.
+ * Without the date filter every event ever run stays on the homepage tagged
+ * "Registration open" and piles up in the staff event picker forever.
+ * Soonest first.
+ */
+export const getPublishedEvents = onCall(async () => {
+  const { current } = await publishedEventsSplit();
+  return { events: current };
 });
 
 /**
@@ -54,25 +81,10 @@ export const getEvent = onCall<{ slug: string }>(async (request) => {
  *
  * Unauthenticated, like the rest of this file: it is the same information the
  * event's own page has always shown to anyone with the link.
- *
- * Needs its own events(status ASC, startsAt DESC) composite index — Firestore
- * does NOT reverse-scan the ascending twin that `getPublishedEvents` uses, and
- * without it every call fails with FAILED_PRECONDITION. The Firestore emulator
- * does not enforce index requirements, so this only ever shows up in a
- * deployed environment: don't take a green local run as proof.
  */
 export const getPastEvents = onCall(async () => {
-  const snap = await db
-    .collection("events")
-    .where("status", "==", "published")
-    .where("startsAt", "<", eventCutoff())
-    .orderBy("startsAt", "desc")
-    .limit(PAST_EVENTS_LIMIT)
-    .get();
-
-  return {
-    events: snap.docs.map((doc) => eventToDTO(doc.id, doc.data() as EventDoc)),
-  };
+  const { past } = await publishedEventsSplit();
+  return { events: past.slice(0, PAST_EVENTS_LIMIT) };
 });
 
 /**

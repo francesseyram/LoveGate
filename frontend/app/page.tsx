@@ -6,7 +6,8 @@ import Image from "next/image";
 import { Anton, IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { PastEventStub } from "@/components/PastEventStub";
 import { getPastEvents, getPublishedEvents, getCallableErrorMessage } from "@/lib/functions";
-import type { EventSummary } from "@/lib/types";
+import type { EventSession, EventSummary } from "@/lib/types";
+import { eventEndsAt, eventSessions } from "@/lib/eventShape";
 
 /**
  * LoveGate homepage.
@@ -42,9 +43,10 @@ const plexMono = IBM_Plex_Mono({
 const ARCHIVE_PREVIEW = 4;
 
 /**
- * The data model has no `endsAt`, so "still on" is an assumption: an event
- * stays listed for six hours past its start, then drops off. That keeps a
- * finished gathering from advertising itself as open indefinitely.
+ * Sessions have a start but no end, so "still on" is an assumption: an event
+ * stays listed for six hours past the start of its *last* session, then drops
+ * off. That keeps a finished gathering from advertising itself as open
+ * indefinitely, without retiring a Friday-and-Sunday event on Saturday.
  */
 const ASSUMED_RUN_TIME_MS = 6 * 60 * 60 * 1000;
 
@@ -54,7 +56,7 @@ const ACCRA = "Africa/Accra";
 function toUpcoming(list: EventSummary[]): EventSummary[] {
   const cutoff = Date.now() - ASSUMED_RUN_TIME_MS;
   return list
-    .filter((event) => new Date(event.startsAt).getTime() > cutoff)
+    .filter((event) => new Date(eventEndsAt(event)).getTime() > cutoff)
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }
 
@@ -117,12 +119,20 @@ function useNow(): number {
  * Live countdown to the door opening. Sits in the hero because "how long have
  * I got" is the one thing that changes between visits.
  */
-function Countdown({ startsAt }: { startsAt: string }) {
+function Countdown({ sessions }: { sessions: EventSession[] }) {
   const now = useNow();
 
   // 0 until the store is subscribed; reserving the height stops the hero from
   // jumping when the first tick lands.
   if (now === 0) return <div className="h-[78px]" aria-hidden />;
+
+  // Counts to whichever session is next. Between the two halves of a
+  // two-session event, that's the second one — "happening now" on Saturday
+  // would send people to an empty room.
+  const upcoming = sessions.find((session) => new Date(session.startsAt).getTime() > now);
+  const target = upcoming ?? sessions[sessions.length - 1];
+  const startsAt = target.startsAt;
+  const label = sessions.length > 1 ? `${target.name} starts in` : "Starts in";
 
   const diff = new Date(startsAt).getTime() - now;
 
@@ -148,7 +158,7 @@ function Countdown({ startsAt }: { startsAt: string }) {
 
   return (
     <div>
-      <p className="text-[11px] font-bold tracking-[0.16em] text-cream/45 uppercase">Starts in</p>
+      <p className="text-[11px] font-bold tracking-[0.16em] text-cream/45 uppercase">{label}</p>
       {/* The digits retick every second; a screen reader gets the static date
           from the sr-only line instead of an endless stream of updates. */}
       <div aria-hidden className="mt-2.5 flex gap-2 sm:gap-2.5">
@@ -166,7 +176,10 @@ function Countdown({ startsAt }: { startsAt: string }) {
           </div>
         ))}
       </div>
-      <p className="sr-only">Starts on {fullDateOf(startsAt)} at {timeOf(startsAt)}</p>
+      <p className="sr-only">
+        {sessions.length > 1 ? `${target.name} starts` : "Starts"} on {fullDateOf(startsAt)} at{" "}
+        {timeOf(startsAt)}
+      </p>
     </div>
   );
 }
@@ -324,10 +337,48 @@ function StarIcon({ className = "" }: IconProps) {
    Hero — full bleed
    ---------------------------------------------------------------------- */
 
+/** When and where for a single-session event — the hero's original layout. */
+function SessionDetails({ session }: { session: EventSession }) {
+  return (
+    <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:gap-10">
+      <div className="flex items-start gap-3">
+        <CalendarIcon className="mt-0.5 text-gold" />
+        <div>
+          <p className="text-[15px] font-semibold text-cream sm:text-[15.5px]">
+            {fullDateOf(session.startsAt)}
+          </p>
+          <p className="text-[14px] text-cream/55">{timeOf(session.startsAt)}</p>
+        </div>
+      </div>
+      {session.location && (
+        <div className="flex items-start gap-3">
+          <PinIcon className="mt-0.5 text-gold" />
+          <div>
+            <p className="text-[15px] font-semibold text-cream sm:text-[15.5px]">
+              {session.location}
+            </p>
+            {session.locationUrl && (
+              <a
+                href={session.locationUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="-my-1 inline-flex min-h-11 items-center rounded text-[14.5px] font-semibold text-gold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              >
+                Open in Maps
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Hero({ event }: { event: EventSummary }) {
   // Only bleed real artwork; smearing the generated gradient behind itself
   // would just look like a rendering fault.
   const [bleed, setBleed] = useState<string | null>(null);
+  const sessions = eventSessions(event);
 
   return (
     <section className="relative isolate overflow-hidden bg-[#120807]">
@@ -390,40 +441,47 @@ function Hero({ event }: { event: EventSummary }) {
             </p>
           )}
 
-          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:gap-10">
-            <div className="flex items-start gap-3">
-              <CalendarIcon className="mt-0.5 text-gold" />
-              <div>
-                <p className="text-[15px] font-semibold text-cream sm:text-[15.5px]">
-                  {fullDateOf(event.startsAt)}
-                </p>
-                <p className="text-[14px] text-cream/55">{timeOf(event.startsAt)}</p>
-              </div>
-            </div>
-            {event.location && (
-              <div className="flex items-start gap-3">
-                <PinIcon className="mt-0.5 text-gold" />
-                <div>
-                  <p className="text-[15px] font-semibold text-cream sm:text-[15.5px]">
-                    {event.location}
+          {sessions.length === 1 ? (
+            <SessionDetails session={sessions[0]} />
+          ) : (
+            <ol className="mt-6 grid w-full gap-3 sm:grid-cols-2">
+              {sessions.map((session) => (
+                <li
+                  key={`${session.name}-${session.startsAt}`}
+                  className="rounded-2xl bg-white/6 p-4 ring-1 ring-white/10"
+                >
+                  <p className="text-[11px] font-bold tracking-[0.14em] text-gold uppercase">
+                    {session.name}
                   </p>
-                  {event.locationUrl && (
+                  <p className="mt-1.5 text-[15px] font-semibold text-cream">
+                    {fullDateOf(session.startsAt)}
+                  </p>
+                  <p className="text-[14px] text-cream/55">{timeOf(session.startsAt)}</p>
+                  {session.location && (
+                    <p className="mt-2 text-[14px] leading-snug text-cream/70">{session.location}</p>
+                  )}
+                  {session.locationUrl && (
                     <a
-                      href={event.locationUrl}
+                      href={session.locationUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="-my-1 inline-flex min-h-11 items-center rounded text-[14.5px] font-semibold text-gold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                      className="-my-1 inline-flex min-h-11 items-center rounded text-[14px] font-semibold text-gold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
                     >
                       Open in Maps
                     </a>
                   )}
-                </div>
-              </div>
-            )}
-          </div>
+                </li>
+              ))}
+            </ol>
+          )}
+          {sessions.length > 1 && (
+            <p className="mt-3 text-[13.5px] text-cream/55">
+              One registration, one ticket for all {sessions.length}.
+            </p>
+          )}
 
           <div className="mt-7 w-full sm:w-auto">
-            <Countdown startsAt={event.startsAt} />
+            <Countdown sessions={sessions} />
           </div>
 
           <Link
@@ -559,6 +617,15 @@ const GOOD_TO_KNOW = [
 ];
 
 function GoodToKnow({ event }: { event?: EventSummary }) {
+  // One "Getting there" per distinct venue: two sessions in the same hall
+  // shouldn't print the same address twice.
+  const venues = event
+    ? eventSessions(event).filter(
+        (session, index, all) =>
+          session.location && all.findIndex((other) => other.location === session.location) === index
+      )
+    : [];
+
   return (
     <section className="mt-14 sm:mt-16">
       <h2 className="text-[24px] font-extrabold tracking-[-0.03em] text-ink sm:text-[26px]">
@@ -578,20 +645,25 @@ function GoodToKnow({ event }: { event?: EventSummary }) {
         ))}
       </div>
 
-      {event?.location && (
-        <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      {venues.map((session) => (
+        <div
+          key={`${session.name}-${session.location}`}
+          className="mt-4 flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+        >
           <div className="flex items-start gap-3.5">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink/5 text-ink/70">
               <PinIcon className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-[17px] font-bold tracking-[-0.01em] text-ink">Getting there</h3>
-              <p className="mt-1 text-[14.5px] text-ink/60">{event.location}</p>
+              <h3 className="text-[17px] font-bold tracking-[-0.01em] text-ink">
+                {venues.length > 1 ? `Getting to ${session.name}` : "Getting there"}
+              </h3>
+              <p className="mt-1 text-[14.5px] text-ink/60">{session.location}</p>
             </div>
           </div>
-          {event.locationUrl && (
+          {session.locationUrl && (
             <a
-              href={event.locationUrl}
+              href={session.locationUrl}
               target="_blank"
               rel="noreferrer"
               className="shrink-0 rounded-full border border-line px-5 py-2.5 text-center text-[14px] font-semibold text-ink transition hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
@@ -600,7 +672,7 @@ function GoodToKnow({ event }: { event?: EventSummary }) {
             </a>
           )}
         </div>
-      )}
+      ))}
     </section>
   );
 }

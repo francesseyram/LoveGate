@@ -4,6 +4,8 @@ import * as logger from "firebase-functions/logger";
 import { RESEND_FROM_EMAIL, SITE_URL } from "./secrets";
 import { SOCIAL_LINKS } from "./socials";
 import type { EventDoc } from "./types";
+import { CHAPTERS, chapterOf, eventSessions } from "./eventShape";
+import type { SessionDoc } from "./eventShape";
 
 let resendClient: Resend | null = null;
 
@@ -103,10 +105,28 @@ export function isToday(startsAt: Date, now = new Date()): boolean {
   return eventYear === year && eventMonth === month && eventDay === day;
 }
 
-function venuePlain(event: EventDoc): string {
-  if (!event.location) return "";
-  const base = ` at ${event.location}`;
-  return event.locationUrl ? `${base}\nDirections: ${event.locationUrl}` : base;
+function venuePlain(session: SessionDoc): string {
+  if (!session.location) return "";
+  const base = ` at ${session.location}`;
+  return session.locationUrl ? `${base}\nDirections: ${session.locationUrl}` : base;
+}
+
+/**
+ * The When lines of a plain-text email. A single-session event reads as it
+ * always has; a multi-session one names each part, since the ticket is good
+ * for all of them.
+ */
+function whenPlain(event: EventDoc): string[] {
+  const sessions = eventSessions(event);
+  if (sessions.length === 1) {
+    return [`When: ${formatEventDate(sessions[0].startsAt.toDate())}${venuePlain(sessions[0])}`];
+  }
+  return [
+    `Your ticket covers ${sessions.length === 2 ? "both" : `all ${sessions.length}`}:`,
+    ...sessions.map(
+      (session) => `- ${session.name}: ${formatEventDate(session.startsAt.toDate())}${venuePlain(session)}`
+    ),
+  ];
 }
 
 /** `null` drops a line; `""` is a blank line. `.filter(Boolean)` would eat both. */
@@ -243,6 +263,7 @@ function gutter(vertical: string): string {
  * tables and every rule has to live on the element.
  */
 function shell(params: {
+  event: EventDoc;
   preheader: string;
   eyebrow: string;
   eyebrowColor: string;
@@ -250,7 +271,8 @@ function shell(params: {
   body: string;
   footerNote: string;
 }): string {
-  const { preheader, eyebrow, eyebrowColor, heading, body, footerNote } = params;
+  const { event, preheader, eyebrow, eyebrowColor, heading, body, footerNote } = params;
+  const chapter = CHAPTERS[chapterOf(event.chapter)];
   return `<!doctype html>
 <html>
   <head>
@@ -281,7 +303,7 @@ function shell(params: {
                       Love<span style="color:${CORAL};">Gate</span>
                     </td>
                     <td align="right" class="meta" style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(251,243,231,0.5);">
-                      Love Inc Global
+                      ${escapeHtml(chapter.name)}
                     </td>
                   </tr>
                 </table>
@@ -312,7 +334,7 @@ function shell(params: {
             <tr>
               <td class="gutter" style="background:${CANVAS};border-top:1px solid #E9E2D7;${gutter("18px")}">
                 <p style="margin:0;font-size:12.5px;line-height:1.65;color:rgba(25,21,18,0.45);">
-                  Love Inc Global &middot; University of Ghana, Legon<br />
+                  ${escapeHtml(chapter.name)} &middot; ${escapeHtml(chapter.place)}<br />
                   You&rsquo;re receiving this because you registered for an event with LoveGate.
                 </p>
               </td>
@@ -338,23 +360,69 @@ function flyerBlock(hasFlyer: boolean, event: EventDoc): string {
             </tr>`;
 }
 
-/** Label/value rows for when and where. */
-function detailsBlock(event: EventDoc): string {
-  const startsAt = event.startsAt.toDate();
-  const venue = event.location
+const LABEL_STYLE =
+  "font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(25,21,18,0.4);";
+const VALUE_STYLE = `margin-top:5px;font-size:16px;font-weight:600;line-height:1.4;color:${INK};`;
+
+function mapLink(url: string | undefined): string {
+  return url
+    ? `<a href="${escapeHtml(url)}" class="maplink" style="display:inline-block;padding:8px 0;font-size:14.5px;font-weight:600;color:${CORAL};text-decoration:underline;">Open in Maps &rarr;</a>`
+    : "";
+}
+
+/** When/Where rows for a single-session event — the original layout. */
+function singleSessionRows(session: SessionDoc): string {
+  const startsAt = session.startsAt.toDate();
+  const venue = session.location
     ? `
                   <tr>
                     <td style="padding:16px 18px 0 18px;">
-                      <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(25,21,18,0.4);">Where</div>
-                      <div style="margin-top:5px;font-size:16px;font-weight:600;line-height:1.4;color:${INK};">${escapeHtml(event.location)}</div>
-                      ${
-                        event.locationUrl
-                          ? `<a href="${escapeHtml(event.locationUrl)}" class="maplink" style="display:inline-block;padding:8px 0;font-size:14.5px;font-weight:600;color:${CORAL};text-decoration:underline;">Open in Maps &rarr;</a>`
-                          : ""
-                      }
+                      <div style="${LABEL_STYLE}">Where</div>
+                      <div style="${VALUE_STYLE}">${escapeHtml(session.location)}</div>
+                      ${mapLink(session.locationUrl)}
                     </td>
                   </tr>`
     : "";
+  return `
+                  <tr>
+                    <td style="padding:18px 18px 18px 18px;">
+                      <div style="${LABEL_STYLE}">When</div>
+                      <div style="${VALUE_STYLE}">${escapeHtml(formatDatePart(startsAt))}</div>
+                      <div style="margin-top:2px;font-size:15px;color:rgba(25,21,18,0.6);">${escapeHtml(formatTimePart(startsAt))}</div>
+                    </td>
+                  </tr>${venue}`;
+}
+
+/**
+ * One block per session for an event that runs over several, each labelled
+ * with its own name and separated by a rule — so "Fire Night" and "Sunday
+ * Service" read as two stops on the same ticket rather than one muddled venue.
+ */
+function multiSessionRows(sessions: SessionDoc[]): string {
+  return sessions
+    .map((session, index) => {
+      const startsAt = session.startsAt.toDate();
+      return `
+                  <tr>
+                    <td style="padding:18px;${index > 0 ? "border-top:1px solid #E9E2D7;" : ""}">
+                      <div style="${LABEL_STYLE}">${escapeHtml(session.name)}</div>
+                      <div style="${VALUE_STYLE}">${escapeHtml(formatDatePart(startsAt))} &middot; ${escapeHtml(formatTimePart(startsAt))}</div>
+                      ${
+                        session.location
+                          ? `<div style="margin-top:2px;font-size:15px;line-height:1.45;color:rgba(25,21,18,0.6);">${escapeHtml(session.location)}</div>`
+                          : ""
+                      }
+                      ${mapLink(session.locationUrl)}
+                    </td>
+                  </tr>`;
+    })
+    .join("");
+}
+
+/** When and where, for every session the ticket covers. */
+function detailsBlock(event: EventDoc): string {
+  const sessions = eventSessions(event);
+  const rows = sessions.length === 1 ? singleSessionRows(sessions[0]) : multiSessionRows(sessions);
 
   // Padding sits on the inner cells, not on the <table>: Outlook ignores
   // padding on a table element and the panel collapses onto its own text.
@@ -362,14 +430,7 @@ function detailsBlock(event: EventDoc): string {
             <tr>
               <td class="gutter" style="${gutter("20px")}padding-bottom:0;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                       style="background:${CANVAS};border:1px solid #E9E2D7;border-radius:12px;">
-                  <tr>
-                    <td style="padding:18px 18px 18px 18px;">
-                      <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(25,21,18,0.4);">When</div>
-                      <div style="margin-top:5px;font-size:16px;font-weight:600;line-height:1.4;color:${INK};">${escapeHtml(formatDatePart(startsAt))}</div>
-                      <div style="margin-top:2px;font-size:15px;color:rgba(25,21,18,0.6);">${escapeHtml(formatTimePart(startsAt))}</div>
-                    </td>
-                  </tr>${venue}
+                       style="background:${CANVAS};border:1px solid #E9E2D7;border-radius:12px;">${rows}
                 </table>
               </td>
             </tr>`;
@@ -486,6 +547,23 @@ function socialsBlock(): string {
             </tr>`;
 }
 
+/**
+ * " The same code gets you into Fire Night and Sunday Service." — empty for a
+ * single-session event. Spelled out because the natural assumption with two
+ * dates is that you need two tickets.
+ */
+function coversAll(event: EventDoc): string {
+  if (eventSessions(event).length < 2) return "";
+  return ` The same code gets you into ${escapeHtml(sessionNames(event))}.`;
+}
+
+/** "Fire Night and Sunday Service"; just the event's name when it has one session. */
+function sessionNames(event: EventDoc): string {
+  const names = eventSessions(event).map((session) => session.name);
+  if (names.length < 2) return event.name;
+  return names.length === 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
 function paragraph(html: string): string {
   return `
             <tr>
@@ -534,9 +612,9 @@ export async function sendConfirmationEmail(params: {
     text: plainText([
       `Hi ${firstName},`,
       ``,
-      `You're registered for ${event.name}.`,
+      `You're registered for ${sessionNames(event)}.`,
       ``,
-      `When: ${formatEventDate(startsAt)}${venuePlain(event)}`,
+      ...whenPlain(event),
       ticketRef ? `Ticket: ${ticketRef}` : null,
       ``,
       `Your QR ticket is attached. Show it at the door and you're in.`,
@@ -547,6 +625,7 @@ export async function sendConfirmationEmail(params: {
       `See you there.`,
     ]),
     html: shell({
+      event,
       preheader: `Your ticket for ${event.name} on ${formatDatePart(startsAt)}.`,
       eyebrow: "You're registered",
       eyebrowColor: CORAL,
@@ -554,7 +633,7 @@ export async function sendConfirmationEmail(params: {
       body: [
         flyerBlock(Boolean(flyer), event),
         paragraph(
-          `Hi ${escapeHtml(firstName)}, you're on the list. Show the code below at the door. That's the whole check-in.`
+          `Hi ${escapeHtml(firstName)}, you're on the list. Show the code below at the door. That's the whole check-in.${coversAll(event)}`
         ),
         ticketBlock({ ticketRef, caption: "Show this at the entrance" }),
         detailsBlock(event),
@@ -628,13 +707,14 @@ export async function sendReminderEmail(params: {
           ? `${event.name} is tomorrow.`
           : `${event.name} is coming up.`,
       ``,
-      `When: ${formatEventDate(startsAt)}${venuePlain(event)}`,
+      ...whenPlain(event),
       ticketRef ? `Ticket: ${ticketRef}` : null,
       ``,
       `Your QR ticket is attached. Have it ready at the door, with your screen`,
       `brightness turned up so it scans first time.`,
     ]),
     html: shell({
+      event,
       preheader: today
         ? `${event.name} starts at ${formatTimePart(startsAt)} today. Your ticket is inside.`
         : tomorrow
@@ -715,6 +795,7 @@ export async function sendThankYouEmail(params: {
       `The next one shows up on LoveGate first. See you there.`,
     ]),
     html: shell({
+      event,
       preheader: `Thank you for being part of it. Here's where to find Love Inc between gatherings.`,
       eyebrow: "Until next time",
       eyebrowColor: GOLD,

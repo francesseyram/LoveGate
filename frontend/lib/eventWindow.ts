@@ -1,4 +1,5 @@
 import type { EventSummary } from "@/lib/types";
+import { eventEndsAt } from "@/lib/eventShape";
 
 /**
  * Mirrors backend/functions/src/eventWindow.ts. Kept in step by hand, like the
@@ -13,8 +14,12 @@ import type { EventSummary } from "@/lib/types";
  */
 export const EVENT_GRACE_HOURS = 12;
 
-export function isEventPast(startsAt: string, now: number = Date.now()): boolean {
-  return new Date(startsAt).getTime() < now - EVENT_GRACE_HOURS * 60 * 60 * 1000;
+/**
+ * Past once the grace window after the *last* session has gone by — so an
+ * event that runs Friday and Sunday is still open on Saturday.
+ */
+export function isEventPast(event: EventSummary, now: number = Date.now()): boolean {
+  return new Date(eventEndsAt(event)).getTime() < now - EVENT_GRACE_HOURS * 60 * 60 * 1000;
 }
 
 export interface SplitEvents {
@@ -27,7 +32,7 @@ export function splitByWindow(events: EventSummary[], now: number = Date.now()):
   const current: EventSummary[] = [];
   const past: EventSummary[] = [];
   for (const event of events) {
-    (isEventPast(event.startsAt, now) ? past : current).push(event);
+    (isEventPast(event, now) ? past : current).push(event);
   }
   const at = (event: EventSummary) => new Date(event.startsAt).getTime();
   current.sort((a, b) => at(a) - at(b));

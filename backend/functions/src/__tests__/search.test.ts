@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSearchPrefixes, buildTicketRef, registrationDocId } from "../search";
+import { buildSearchPrefixes, buildTicketRef, registrationDocId, searchTermsFor } from "../search";
 
 describe("buildSearchPrefixes", () => {
   it("indexes every prefix of every word, not just the full name", () => {
@@ -73,5 +73,31 @@ describe("registrationDocId", () => {
 describe("buildTicketRef", () => {
   it("produces a short, human-quotable code", () => {
     expect(buildTicketRef("evt1_abcdef123456")).toBe("LG-123456");
+  });
+});
+
+describe("searchTermsFor", () => {
+  it("strips punctuation from an ordinary query", () => {
+    expect(searchTermsFor("  Ama Owusu ")).toEqual(["amaowusu"]);
+  });
+
+  it("finds a ticket ref typed exactly as printed", () => {
+    const ref = buildTicketRef("evt_abc123def456");
+    const stored = buildSearchPrefixes("Ama Owusu", ref);
+    const terms = searchTermsFor(ref);
+    expect(terms.some((term) => stored.includes(term))).toBe(true);
+  });
+
+  it("accepts the ref with a space, no separator, or lower case", () => {
+    expect(searchTermsFor("LG 4F9K2A")).toContain("4f9k2a");
+    expect(searchTermsFor("lg4f9k2a")).toContain("4f9k2a");
+  });
+
+  it("keeps the plain term so names starting with 'lg' still match", () => {
+    expect(searchTermsFor("Lgadzo")).toContain("lgadzo");
+  });
+
+  it("returns nothing for an empty or punctuation-only query", () => {
+    expect(searchTermsFor("  - ")).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { db } from "./admin";
 import { RegistrationDoc, registrationToSummary } from "./types";
+import { searchTermsFor } from "./search";
 
 export function requireStaff(request: CallableRequest<unknown>): string {
   if (!request.auth) {
@@ -52,18 +53,21 @@ export const checkInByQr = onCall<CheckInByQrInput>(async (request) => {
     throw new HttpsError("invalid-argument", "eventId and qrValue are required");
   }
 
-  const snap = await db.collection("registrations").where("qrValue", "==", qrValue).limit(1).get();
+  // One QR can belong to more than one registration: someone who signed up for
+  // a companion event from the same form holds a single ticket for both (see
+  // registration.ts). So find every row with this code and take the one for
+  // the event at this door.
+  const snap = await db.collection("registrations").where("qrValue", "==", qrValue).limit(10).get();
   if (snap.empty) {
     throw new HttpsError("not-found", "No ticket found for this QR code");
   }
 
-  const doc = snap.docs[0];
-  const registration = doc.data() as RegistrationDoc;
-  if (registration.eventId !== eventId) {
+  const doc = snap.docs.find((candidate) => candidate.get("eventId") === eventId);
+  if (!doc) {
     throw new HttpsError("not-found", "This ticket is not for the selected event");
   }
 
-  return markCheckedIn(doc.ref, registration, staffUid);
+  return markCheckedIn(doc.ref, doc.data() as RegistrationDoc, staffUid);
 });
 
 interface CheckInByIdInput {
@@ -178,23 +182,29 @@ export const searchRegistrations = onCall<SearchInput>(async (request) => {
     throw new HttpsError("invalid-argument", "eventId and query are required");
   }
 
-  // Strip punctuation so a typed ticket ref like "LG-4F9K2A" also matches.
-  const q = query.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (!q) {
+  const terms = searchTermsFor(query);
+  if (terms.length === 0) {
     return { registrations: [] };
   }
 
   // array-contains against pre-computed prefixes matches ANY word in the name
   // (surname included) — a range query on nameLower only ever matched from the
   // start of the full string, so "owusu" could never find "Ama Owusu".
-  const snap = await db
-    .collection("registrations")
-    .where("eventId", "==", eventId)
-    .where("searchPrefixes", "array-contains", q)
-    .limit(20)
-    .get();
+  const snaps = await Promise.all(
+    terms.map((term) =>
+      db
+        .collection("registrations")
+        .where("eventId", "==", eventId)
+        .where("searchPrefixes", "array-contains", term)
+        .limit(20)
+        .get()
+    )
+  );
+  const docs = new Map(snaps.flatMap((snap) => snap.docs).map((doc) => [doc.id, doc]));
 
   return {
-    registrations: snap.docs.map((doc) => registrationToSummary(doc.id, doc.data() as RegistrationDoc)),
+    registrations: [...docs.values()]
+      .slice(0, 20)
+      .map((doc) => registrationToSummary(doc.id, doc.data() as RegistrationDoc)),
   };
 });

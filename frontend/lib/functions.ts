@@ -77,6 +77,8 @@ export async function registerForEvent(input: {
   level: string;
   whatsapp?: string;
   invitedBy?: string;
+  /** The event's companion, when the person ticked it — see EventSummary.companionSlug. */
+  alsoEventId?: string;
 }): Promise<RegisterForEventResult> {
   const call = httpsCallable<typeof input, RegisterForEventResult>(functions, "registerForEvent");
   const { data } = await call(input);

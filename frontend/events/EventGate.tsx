@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eventPages } from "./registry";
+import EventTemplate from "./EventTemplate";
 import { PastEventView } from "./PastEventView";
 import { FunctionsError } from "firebase/functions";
 import { getEvent, getCallableErrorMessage } from "@/lib/functions";
@@ -21,17 +22,15 @@ import type { EventSummary } from "@/lib/types";
  * and error handling to get wrong independently. Themed pages are now handed
  * a resolved event and do nothing but draw it.
  *
- * The registry is checked here rather than in the route, because whether a
- * hand-built page is required depends on something the route cannot know. A
- * finished event doesn't need one — the archive view is the same for all of
- * them — and the archive lists every past published event, including ones that
- * predate the registry or never got their own page. Checking the registry
- * first would have sent those to a 404 from their own archive card.
+ * An open event gets the shared `EventTemplate`, drawn from its doc, unless
+ * `registry.tsx` names a hand-built page for its slug. A finished event gets
+ * `PastEventView` whatever it has, so neither ever 404s from its own link.
  */
 export function EventGate({ slug }: { slug: string }) {
   const [event, setEvent] = useState<EventSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  const [companion, setCompanion] = useState<EventSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +52,23 @@ export function EventGate({ slug }: { slug: string }) {
       cancelled = true;
     };
   }, [slug]);
+
+  // The sister event offered on this one's form. Fetched after the event so it
+  // never holds the page up, and dropped quietly if it can't be had: the form
+  // simply doesn't offer it.
+  const companionSlug = event?.companionSlug;
+  useEffect(() => {
+    if (!companionSlug) return;
+    let cancelled = false;
+    getEvent(companionSlug)
+      .then((next) => {
+        if (!cancelled && next.status === "published" && !isEventPast(next)) setCompanion(next);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [companionSlug]);
 
   if (missing) {
     notFound();
@@ -83,16 +99,14 @@ export function EventGate({ slug }: { slug: string }) {
     );
   }
 
-  if (isEventPast(event.startsAt)) {
+  if (isEventPast(event)) {
     return <PastEventView event={event} />;
   }
 
-  // An open event with no hand-built page is a genuine gap — someone published
-  // it without shipping the page — and there is nothing sensible to render.
+  // Every open event gets the shared template unless the registry names a
+  // hand-built page for it.
   const Themed = eventPages[slug];
-  if (!Themed) {
-    notFound();
-  }
+  if (Themed) return <Themed event={event} />;
 
-  return <Themed event={event} />;
+  return <EventTemplate event={event} companion={companion} />;
 }

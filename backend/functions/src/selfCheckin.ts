@@ -183,7 +183,7 @@ export const selfCheckIn = onCall<{ eventId: string; key: string }>(async (reque
     throw new HttpsError("not-found", "Event not found");
   }
   const event = eventSnap.data() as EventDoc;
-  if (event.status !== "published" || !isEventCurrent(event.startsAt)) {
+  if (event.status !== "published" || !isEventCurrent(event)) {
     throw new HttpsError("failed-precondition", "Check-in for this event is closed");
   }
 

@@ -34,6 +34,24 @@ export function buildSearchPrefixes(name: string, ticketRef?: string): string[] 
   return Array.from(prefixes);
 }
 
+/**
+ * What to look up for a search box entry. Usually one term: the entry with
+ * punctuation stripped, matched against the stored prefixes.
+ *
+ * A ticket ref needs a second one. "LG-4F9K2A" is stored as two tokens, "lg"
+ * and "4f9k2a", so the stripped query "lg4f9k2a" matches neither, and staff
+ * typing the code exactly as printed found nobody. When the entry looks like a
+ * ref, its code part is searched too. The plain term stays, so a name that
+ * happens to start with "lg" is still found.
+ */
+export function searchTermsFor(query: string): string[] {
+  const lower = query.trim().toLowerCase();
+  const plain = lower.replace(/[^a-z0-9]/g, "");
+  if (!plain) return [];
+  const ref = /^lg[\s-]*([a-z0-9]{1,6})$/.exec(lower);
+  return ref && ref[1] !== plain ? [plain, ref[1]] : [plain];
+}
+
 /** Short human-quotable code printed on the ticket, e.g. "LG-4F9K2A". */
 export function buildTicketRef(registrationId: string): string {
   return `LG-${registrationId.slice(-6).toUpperCase()}`;

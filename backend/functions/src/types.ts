@@ -1,5 +1,7 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { buildTicketRef } from "./search";
+import { chapterOf, eventEndsAt, eventSessions } from "./eventShape";
+import type { Chapter, EventTheme, SessionDoc } from "./eventShape";
 
 export type EventStatus = "draft" | "published";
 export type RegistrationStatus = "going" | "checked_in";
@@ -20,6 +22,32 @@ export interface EventDoc {
   /** Map link for the venue, shown wherever the location is. */
   locationUrl?: string;
   status: EventStatus;
+  /**
+   * The gatherings this one registration covers, when there is more than one.
+   * Absent means a single session made of the fields above — see eventShape.ts.
+   * When present, `startsAt`/`location` should match the first session: the
+   * reminder schedule and anything that predates sessions still read them.
+   */
+  sessions?: SessionDoc[];
+  /** Hosting chapter; absent means "global". */
+  chapter?: Chapter;
+  /** Visual preset for the shared event page; absent means the default. */
+  theme?: EventTheme;
+  /** One short line under the event name on its page, e.g. "The Fire of God". */
+  tagline?: string;
+  /**
+   * Slug of a sister event people can register for from this one's form with
+   * a single tick (Fire Night ↔ Sunday Service). Both registrations then share
+   * one QR ticket — see registration.ts. Set on both events, pointing at each
+   * other.
+   */
+  companionSlug?: string;
+  /**
+   * What to put on the event page's map: a Google Maps search, best as a plus
+   * code ("MCFP+22R, Kumasi") since campus buildings rarely have addresses.
+   * Absent means no map.
+   */
+  mapQuery?: string;
   reminderSentAt?: Timestamp | null;
   /**
    * Late-arrival mode. While true, `registerForEvent` writes new registrations
@@ -80,6 +108,13 @@ export interface RegistrationDoc {
   source?: string;
   /** Links back to member_db when this row was raised from a member record. */
   memberId?: string;
+  /**
+   * Set when this registration was made alongside one for a companion event
+   * and reuses that one's QR ticket: the id of the registration the ticket
+   * was issued for. The ticket ref people see (and search by) comes from it,
+   * so a single printed ref finds them at both events.
+   */
+  ticketOf?: string;
 }
 
 /** Wire-format sent to the client: Firestore Timestamps become ISO strings. */
@@ -93,6 +128,22 @@ export interface EventDTO {
   location?: string;
   locationUrl?: string;
   status: EventStatus;
+  /** Always at least one; a single-session event gets one built from the fields above. */
+  sessions: SessionDTO[];
+  /** When the last session starts — what decides whether the event is still open. */
+  endsAt: string;
+  chapter: Chapter;
+  theme?: EventTheme;
+  tagline?: string;
+  companionSlug?: string;
+  mapQuery?: string;
+}
+
+export interface SessionDTO {
+  name: string;
+  startsAt: string;
+  location?: string;
+  locationUrl?: string;
 }
 
 export interface RegistrationDTO {
@@ -128,13 +179,18 @@ export interface RegistrationSummaryDTO {
   checkedInAt: string | null;
 }
 
+/** The ref printed on this person's ticket, which a shared ticket takes from its first registration. */
+export function ticketRefOf(id: string, doc: Pick<RegistrationDoc, "ticketOf">): string {
+  return buildTicketRef(doc.ticketOf ?? id);
+}
+
 export function registrationToSummary(id: string, doc: RegistrationDoc): RegistrationSummaryDTO {
   return {
     id,
     eventId: doc.eventId,
     name: doc.name,
     email: doc.email,
-    ticketRef: buildTicketRef(id),
+    ticketRef: ticketRefOf(id, doc),
     status: doc.status,
     checkedInAt: doc.checkedInAt ? doc.checkedInAt.toDate().toISOString() : null,
   };
@@ -151,6 +207,18 @@ export function eventToDTO(id: string, doc: EventDoc): EventDTO {
     location: doc.location,
     locationUrl: doc.locationUrl,
     status: doc.status,
+    sessions: eventSessions(doc).map((session) => ({
+      name: session.name,
+      startsAt: session.startsAt.toDate().toISOString(),
+      location: session.location,
+      locationUrl: session.locationUrl,
+    })),
+    endsAt: eventEndsAt(doc).toDate().toISOString(),
+    chapter: chapterOf(doc.chapter),
+    theme: doc.theme,
+    tagline: doc.tagline,
+    companionSlug: doc.companionSlug,
+    mapQuery: doc.mapQuery,
   };
 }
 
