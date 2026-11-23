@@ -924,7 +924,6 @@ export default function HomePage() {
             >
               Staff sign-in
             </Link>
-            <p className="text-[13.5px] text-cream/40">University of Ghana, Legon</p>
           </div>
         </div>
       </footer>

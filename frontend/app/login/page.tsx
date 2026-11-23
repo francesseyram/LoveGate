@@ -177,7 +177,7 @@ export default function LoginPage() {
             alt=""
             className="h-10 w-10 object-contain opacity-80"
           />
-          <p className="text-[13.5px] text-cream/45">Love Inc Global · University of Ghana, Legon</p>
+          <p className="text-[13.5px] text-cream/45">Love Inc Global</p>
         </div>
       </section>
 
