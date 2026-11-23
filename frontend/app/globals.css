@@ -3,7 +3,9 @@
 @theme inline {
   --color-coral: #b23a48;
   --color-coral-dark: #8f2e39;
-  --color-gold: #d9a441;
+  /* An event can swap its own highlight in by setting --accent on a wrapper
+     (lib/accent.ts), which re-tints every gold utility beneath it. */
+  --color-gold: var(--accent, #d9a441);
   --color-cream: #fbf3e7;
   --color-charcoal: #2e2a26;
 

@@ -12,6 +12,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 setGlobalOptions({ region: "europe-west1", maxInstances: 20 });
 
 export { getPublishedEvents, getPastEvents, getStaffEvents, getEvent } from "./events";
+export { getAllEvents, saveEvent } from "./eventAdmin";
 export { registerForEvent } from "./registration";
 export { checkInByQr, checkInByRegistrationId, undoCheckIn, searchRegistrations } from "./checkin";
 export { getEventSettings, setEventAutoCheckIn } from "./eventSettings";

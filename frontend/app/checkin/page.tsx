@@ -7,6 +7,7 @@ import { CheckinScanner } from "@/components/CheckinScanner";
 import { CheckinSearch } from "@/components/CheckinSearch";
 import { FireBackground } from "@/components/FireBackground";
 import { StaffNav } from "@/components/StaffNav";
+import { accentStyle } from "@/lib/accent";
 import { getStaffEvents } from "@/lib/functions";
 import { sortStaffEvents } from "@/lib/eventWindow";
 import { useOfflineCheckin, type CheckinOutcome } from "@/lib/useOfflineCheckin";
@@ -242,6 +243,9 @@ function CheckinTool() {
   return (
     <main
       className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
+      // The accent only: the door runs on phones all evening, so it keeps the
+      // light ember layer rather than the event's full animated backdrop.
+      style={accentStyle(selectedEvent)}
     >
       <FireBackground />
 

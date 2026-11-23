@@ -23,6 +23,8 @@ export interface EventSummary {
   chapter?: Chapter;
   /** Preset for the shared event page — see events/themes.ts. */
   theme?: string;
+  /** "#rrggbb" highlight for the event page and staff tools; absent = house gold. See lib/accent.ts. */
+  accent?: string;
   tagline?: string;
   /**
    * Slug of a sister event this one's form offers to register for too, with
@@ -165,4 +167,21 @@ export interface SelfCheckinMatch {
   campus: string;
   maskedPhone: string;
   alreadyCheckedIn: boolean;
+}
+
+/** What the staff event editor sends to `saveEvent`. Mirrors backend `EventInput`. */
+export interface EventInput {
+  name: string;
+  slug: string;
+  description: string;
+  tagline: string;
+  coverPhotoUrl: string;
+  chapter: Chapter;
+  theme: string;
+  accent: string;
+  status: EventStatus;
+  companionSlug: string;
+  mapQuery: string;
+  /** One for an ordinary event; with several, each needs its own name. */
+  sessions: Array<{ name: string; startsAt: string; location: string; locationUrl: string }>;
 }

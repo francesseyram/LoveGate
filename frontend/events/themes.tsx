@@ -14,11 +14,21 @@ import { FlameField } from "@/components/FlameField";
  * through as an opaque string.
  */
 export interface EventTheme {
-  /** Drawn behind the hero content, filling it. */
+  /** As staff see it in the event editor. */
+  label: string;
+  /** One line under the label, saying what the look is. */
+  blurb: string;
+  /**
+   * Drawn behind the hero content, filling it. The staff tools reuse it for
+   * the banner across the top of each page, so it has to fill whatever box
+   * it is given rather than assume a full screen.
+   */
   heroBackground: ReactNode;
 }
 
 const fire: EventTheme = {
+  label: "Fire",
+  blurb: "Live flames with smoke and sparks rising off them.",
   heroBackground: (
     <>
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_100%,#4A0812_0%,#1C0507_45%,#0D0505_80%)]" />
@@ -31,6 +41,8 @@ const fire: EventTheme = {
 
 /** Revive's look: a slow-breathing glow with embers drifting up through it. */
 const embers: EventTheme = {
+  label: "Embers",
+  blurb: "A slow, breathing glow with embers drifting up.",
   heroBackground: (
     <>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_105%,#7a1f24_0%,#3a0f12_32%,#170807_60%,#0D0705_85%)] motion-safe:animate-[hero-glow_8s_ease-in-out_infinite]" />
@@ -41,6 +53,8 @@ const embers: EventTheme = {
 
 /** The quiet default for an event that hasn't picked anything. */
 const glow: EventTheme = {
+  label: "Glow",
+  blurb: "A quiet crimson light from above. No motion.",
   heroBackground: (
     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,#5A1520_0%,#1C0709_50%,#0D0505_85%)]" />
   ),
@@ -49,6 +63,9 @@ const glow: EventTheme = {
 const THEMES: Record<string, EventTheme> = { fire, embers, glow };
 
 export const THEME_NAMES = Object.keys(THEMES);
+
+/** The default when an event hasn't picked one. */
+export const DEFAULT_THEME = "glow";
 
 export function themeFor(name: string | undefined): EventTheme {
   return (name && THEMES[name]) || glow;

@@ -33,6 +33,11 @@ export interface EventDoc {
   chapter?: Chapter;
   /** Visual preset for the shared event page; absent means the default. */
   theme?: EventTheme;
+  /**
+   * Highlight colour, "#rrggbb", tinting the event page and the staff tools
+   * while this event is selected. Absent means the house gold.
+   */
+  accent?: string;
   /** One short line under the event name on its page, e.g. "The Fire of God". */
   tagline?: string;
   /**
@@ -134,6 +139,7 @@ export interface EventDTO {
   endsAt: string;
   chapter: Chapter;
   theme?: EventTheme;
+  accent?: string;
   tagline?: string;
   companionSlug?: string;
   mapQuery?: string;
@@ -216,6 +222,7 @@ export function eventToDTO(id: string, doc: EventDoc): EventDTO {
     endsAt: eventEndsAt(doc).toDate().toISOString(),
     chapter: chapterOf(doc.chapter),
     theme: doc.theme,
+    accent: doc.accent,
     tagline: doc.tagline,
     companionSlug: doc.companionSlug,
     mapQuery: doc.mapQuery,

@@ -3,6 +3,7 @@ import { functions } from "./firebaseClient";
 import type {
   Dashboard,
   EventSettings,
+  EventInput,
   EventSummary,
   RegistrationSummary,
   RegisterForEventResult,
@@ -60,6 +61,20 @@ export async function getStaffEvents(): Promise<EventSummary[]> {
   const call = httpsCallable<void, { events: EventSummary[] }>(functions, "getStaffEvents");
   const { data } = await call();
   return data.events;
+}
+
+/** Staff-only: every event, drafts included, newest first — the event editor's list. */
+export async function getAllEvents(): Promise<EventSummary[]> {
+  const call = httpsCallable<void, { events: EventSummary[] }>(functions, "getAllEvents");
+  const result = await call();
+  return result.data.events;
+}
+
+/** Staff-only: creates an event when `id` is absent, otherwise updates it. */
+export async function saveEvent(input: { id?: string; event: EventInput }): Promise<EventSummary> {
+  const call = httpsCallable<typeof input, { event: EventSummary }>(functions, "saveEvent");
+  const result = await call(input);
+  return result.data.event;
 }
 
 export async function getEvent(slug: string): Promise<EventSummary> {

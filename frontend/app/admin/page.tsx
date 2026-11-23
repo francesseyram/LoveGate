@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Anton, Oswald } from "next/font/google";
 import { AuthGuard } from "@/components/AuthGuard";
 import { AutoCheckInSwitch } from "@/components/AutoCheckInSwitch";
-import { FireBackground } from "@/components/FireBackground";
+import { StaffBackdrop } from "@/components/StaffBackdrop";
+import { accentStyle } from "@/lib/accent";
 import { StaffNav } from "@/components/StaffNav";
 import {
   BarList,
@@ -646,23 +647,30 @@ function DashboardTool() {
 
   return (
     <main
-      className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
+      className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[#0D0705] font-sans text-cream`}
+      style={accentStyle(selectedEvent)}
     >
-      <FireBackground />
+      <StaffBackdrop event={selectedEvent} />
 
       <div className="relative z-10 flex min-h-[100svh] flex-col">
         <StaffNav events={events} eventId={eventId} onEventChange={setEventId} />
 
-        <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))] sm:px-8 sm:pt-9 sm:pb-9">
+        <div className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))] sm:px-8 sm:pt-16 sm:pb-9">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            {/* The event is the headline here, set the way its own page sets
+                it, so the dashboard reads as that event's rather than a
+                generic tool with a name in small print. */}
             <div>
-              <h1 className="font-[family-name:var(--font-anton)] text-[clamp(34px,9vw,60px)] leading-[0.95] tracking-[-0.01em] text-cream uppercase">
+              <p className="font-[family-name:var(--font-oswald)] text-[12px] tracking-[0.18em] text-gold uppercase">
                 Dashboard
+              </p>
+              <h1 className="mt-1 font-[family-name:var(--font-anton)] text-[clamp(40px,10vw,84px)] leading-[0.9] tracking-[-0.02em] text-cream uppercase">
+                {selectedEvent?.name ?? "Dashboard"}
               </h1>
               {selectedEvent && (
-                <p className="mt-1.5 font-[family-name:var(--font-oswald)] text-[13px] tracking-[0.1em] text-cream/50 uppercase">
-                  {selectedEvent.name}
-                  {selectedEvent.location ? ` · ${selectedEvent.location}` : ""}
+                <p className="mt-2.5 font-[family-name:var(--font-oswald)] text-[13px] tracking-[0.1em] text-cream/60 uppercase">
+                  {selectedEvent.tagline ? `${selectedEvent.tagline} · ` : ""}
+                  {selectedEvent.location}
                 </p>
               )}
             </div>

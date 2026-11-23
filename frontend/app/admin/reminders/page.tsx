@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Anton, Oswald } from "next/font/google";
 import { AuthGuard } from "@/components/AuthGuard";
-import { FireBackground } from "@/components/FireBackground";
+import { StaffBackdrop } from "@/components/StaffBackdrop";
+import { accentStyle } from "@/lib/accent";
 import { StaffNav } from "@/components/StaffNav";
 import {
   getStaffEvents,
@@ -215,9 +216,10 @@ function ReminderTool() {
 
   return (
     <main
-      className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_50%_0%,#4a1216_0%,#22090a_38%,#130807_65%,#0D0705_100%)] font-sans text-cream`}
+      className={`${anton.variable} ${oswald.variable} relative min-h-[100svh] overflow-hidden bg-[#0D0705] font-sans text-cream`}
+      style={accentStyle(selectedEvent)}
     >
-      <FireBackground />
+      <StaffBackdrop event={selectedEvent} />
 
       <div className="relative z-10 flex min-h-[100svh] flex-col">
         <StaffNav

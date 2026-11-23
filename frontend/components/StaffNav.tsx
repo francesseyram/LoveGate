@@ -12,7 +12,7 @@ import type { EventSummary } from "@/lib/types";
  *
  * The three tools used to link to each other ad hoc — a back arrow here, a
  * "Reminders →" there — so where you could go depended on where you happened to
- * be, and nothing told you where you were. This puts the same three
+ * be, and nothing told you where you were. This puts the same
  * destinations in the same place on every page with the current one marked, and
  * hoists the event picker out of each page so switching event doesn't mean
  * finding a different control on each screen.
@@ -26,6 +26,7 @@ const TABS = [
   { href: "/checkin", label: "Check-in" },
   { href: "/admin/reminders", label: "Reminders" },
   { href: "/admin/thank-you", label: "Thank-you" },
+  { href: "/admin/events", label: "Events" },
 ];
 
 function GateMark({ className = "" }: { className?: string }) {
@@ -50,7 +51,8 @@ export function StaffNav({
 }: {
   events: EventSummary[];
   eventId: string;
-  onEventChange: (eventId: string) => void;
+  /** Leave out to hide the picker, on a page that chooses events its own way. */
+  onEventChange?: (eventId: string) => void;
   /** Page-specific state — the check-in desk's connection and queue badges. */
   status?: React.ReactNode;
 }) {
@@ -112,7 +114,7 @@ export function StaffNav({
         <div className="ml-auto flex items-center gap-3 sm:gap-4">
           {status}
 
-          {events.length > 0 && (
+          {events.length > 0 && onEventChange && (
             <select
               value={eventId}
               onChange={(event) => onEventChange(event.target.value)}

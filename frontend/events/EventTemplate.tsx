@@ -8,6 +8,7 @@ import { RegistrationForm } from "@/components/RegistrationForm";
 import { chapterOf, dayOf, eventSessions, shortWeekdayOf, timeOf } from "@/lib/eventShape";
 import { SessionTicket, TICKET_GROUND } from "./SessionTicket";
 import { themeFor } from "./themes";
+import { accentStyle } from "@/lib/accent";
 
 const anton = Anton({ variable: "--font-anton", weight: "400", subsets: ["latin"] });
 const oswald = Oswald({
@@ -99,7 +100,10 @@ export default function EventTemplate({
   const [first, ...rest] = sessions;
 
   return (
-    <div className={`${anton.variable} ${oswald.variable} min-h-[100svh] bg-[#0D0505] font-sans`}>
+    <div
+      className={`${anton.variable} ${oswald.variable} min-h-[100svh] bg-[#0D0505] font-sans`}
+      style={accentStyle(event)}
+    >
       <section className="relative flex min-h-[100svh] flex-col items-center overflow-hidden">
         {theme.heroBackground}
 
