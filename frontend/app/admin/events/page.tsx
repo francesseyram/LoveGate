@@ -639,7 +639,7 @@ function EventsTool() {
                       id="school-default"
                       className={field}
                       value={draft.schoolDefault}
-                      placeholder="Tech"
+                      placeholder="KNUST"
                       onChange={(e) => set("schoolDefault", e.target.value)}
                     />
                     <p className={help}>

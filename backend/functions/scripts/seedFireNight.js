@@ -69,7 +69,7 @@ async function main() {
     chapter: "knust",
     theme: "fire",
     companionSlug: "sunday-service",
-    schoolDefault: "Tech",
+    schoolDefault: "KNUST",
   }, status);
 
   const sunday = await upsert("sunday-service", {
@@ -81,7 +81,7 @@ async function main() {
     chapter: "knust",
     theme: "glow",
     companionSlug: "fire-night",
-    schoolDefault: "Tech",
+    schoolDefault: "KNUST",
   }, status);
 
   console.log(
