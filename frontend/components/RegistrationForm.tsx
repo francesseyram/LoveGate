@@ -198,6 +198,7 @@ export function RegistrationForm({
   eventLocationUrl,
   sessions,
   companion,
+  schoolDefault = "",
   theme = "neutral",
 }: {
   eventId: string;
@@ -209,11 +210,13 @@ export function RegistrationForm({
   sessions?: EventSession[];
   /** A sister event to offer with a tick-box; see `EventSummary.companionSlug`. */
   companion?: EventSummary;
+  /** Pre-filled into School and still editable; see `EventSummary.schoolDefault`. */
+  schoolDefault?: string;
   theme?: "neutral" | "revive";
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [school, setSchool] = useState("");
+  const [school, setSchool] = useState(schoolDefault);
   const [phone, setPhone] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [invitedBy, setInvitedBy] = useState("");
@@ -287,7 +290,7 @@ export function RegistrationForm({
   function reset() {
     setName("");
     setEmail("");
-    setSchool("");
+    setSchool(schoolDefault);
     setPhone("");
     setWhatsapp("");
     setInvitedBy("");

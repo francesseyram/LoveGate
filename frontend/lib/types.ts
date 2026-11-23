@@ -33,6 +33,8 @@ export interface EventSummary {
   companionSlug?: string;
   /** Google Maps search for the venue (ideally a plus code); drives the page's map. */
   mapQuery?: string;
+  /** Pre-filled into the registration form's School field, still editable. */
+  schoolDefault?: string;
 }
 
 export interface EventSession {
@@ -182,6 +184,7 @@ export interface EventInput {
   status: EventStatus;
   companionSlug: string;
   mapQuery: string;
+  schoolDefault: string;
   /** One for an ordinary event; with several, each needs its own name. */
   sessions: Array<{ name: string; startsAt: string; location: string; locationUrl: string }>;
 }

@@ -53,6 +53,11 @@ export interface EventDoc {
    * Absent means no map.
    */
   mapQuery?: string;
+  /**
+   * Pre-filled into the form's School field, still editable, for an event
+   * held on one campus where nearly everyone comes from that school.
+   */
+  schoolDefault?: string;
   reminderSentAt?: Timestamp | null;
   /**
    * Late-arrival mode. While true, `registerForEvent` writes new registrations
@@ -143,6 +148,7 @@ export interface EventDTO {
   tagline?: string;
   companionSlug?: string;
   mapQuery?: string;
+  schoolDefault?: string;
 }
 
 export interface SessionDTO {
@@ -226,6 +232,7 @@ export function eventToDTO(id: string, doc: EventDoc): EventDTO {
     tagline: doc.tagline,
     companionSlug: doc.companionSlug,
     mapQuery: doc.mapQuery,
+    schoolDefault: doc.schoolDefault,
   };
 }
 

@@ -74,6 +74,7 @@ function blankDraft(): EventInput {
     status: "draft",
     companionSlug: "",
     mapQuery: "",
+    schoolDefault: "",
     sessions: [blankSession()],
   };
 }
@@ -92,6 +93,7 @@ function draftFrom(event: EventSummary): EventInput {
     status: event.status,
     companionSlug: event.companionSlug ?? "",
     mapQuery: event.mapQuery ?? "",
+    schoolDefault: event.schoolDefault ?? "",
     sessions: sessions.map((session) => ({
       // A single session is the event itself and is named after it.
       name: sessions.length > 1 ? session.name : "",
@@ -627,6 +629,21 @@ function EventsTool() {
                     <p className={help}>
                       What to search Google Maps for. A plus code works best on campus: find the building
                       in Google Maps, tap it, and copy the code that looks like MCFP+22R.
+                    </p>
+                  </div>
+                  <div>
+                    <label className={label} htmlFor="school-default">
+                      Pre-fill School with <span className="normal-case tracking-normal text-cream/35">(optional)</span>
+                    </label>
+                    <input
+                      id="school-default"
+                      className={field}
+                      value={draft.schoolDefault}
+                      placeholder="Tech"
+                      onChange={(e) => set("schoolDefault", e.target.value)}
+                    />
+                    <p className={help}>
+                      For an event on one campus. People can still change it on the form.
                     </p>
                   </div>
                 </Section>

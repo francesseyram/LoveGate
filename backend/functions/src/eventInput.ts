@@ -34,6 +34,7 @@ export interface EventInput {
   status?: string;
   companionSlug?: string;
   mapQuery?: string;
+  schoolDefault?: string;
   sessions?: SessionInput[];
 }
 
@@ -53,10 +54,17 @@ export interface EventFields {
   accent?: string;
   companionSlug?: string;
   mapQuery?: string;
+  schoolDefault?: string;
   sessions?: SessionDoc[];
 }
 
-export type OptionalField = "tagline" | "accent" | "companionSlug" | "mapQuery" | "sessions";
+export type OptionalField =
+  | "tagline"
+  | "accent"
+  | "companionSlug"
+  | "mapQuery"
+  | "schoolDefault"
+  | "sessions";
 
 export type ParseResult =
   | { ok: true; fields: EventFields; cleared: OptionalField[] }
@@ -121,6 +129,9 @@ export function parseEventInput(raw: EventInput | undefined): ParseResult {
   const mapQuery = text(input.mapQuery);
   if (mapQuery.length > 200) return fail("Keep the map search under 200 characters.");
 
+  const schoolDefault = text(input.schoolDefault);
+  if (schoolDefault.length > 80) return fail("Keep the pre-filled school under 80 characters.");
+
   const rawSessions = Array.isArray(input.sessions) ? input.sessions : [];
   if (rawSessions.length === 0) return fail("Add when and where the event happens.");
   if (rawSessions.length > MAX_SESSIONS) return fail(`An event can have at most ${MAX_SESSIONS} sessions.`);
@@ -171,6 +182,7 @@ export function parseEventInput(raw: EventInput | undefined): ParseResult {
     ["accent", accent],
     ["companionSlug", companionSlug],
     ["mapQuery", mapQuery],
+    ["schoolDefault", schoolDefault],
     ["sessions", multi ? sessions : undefined],
   ];
   for (const [key, value] of optional) {

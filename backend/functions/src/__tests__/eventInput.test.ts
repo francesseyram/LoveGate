@@ -94,4 +94,11 @@ describe("parseEventInput", () => {
     expect(parse({ chapter: "legon" }).ok).toBe(false);
     expect(parse({ status: "archived" }).ok).toBe(false);
   });
+
+  it("keeps a pre-filled school when given and clears it when blank", () => {
+    const set = parse({ schoolDefault: " Tech " });
+    expect(set.ok && set.fields.schoolDefault).toBe("Tech");
+    const blank = parse({ schoolDefault: "" });
+    expect(blank.ok && blank.cleared).toContain("schoolDefault");
+  });
 });

@@ -13,14 +13,18 @@
  *   tagline        optional line under the title.
  *   companionSlug  the sister event offered on this one's form.
  *   mapQuery       what the page's map and "Get directions" button point at.
- *                  A plus code is the reliable choice on campus.
+ *                  A plus code is the reliable choice on campus. Left out
+ *                  (and removed) until the venue's real pin is confirmed:
+ *                  no map beats a map to the wrong building.
+ *   schoolDefault  pre-filled into the form's School field, still editable.
  *   locationUrl    the venue link in the emails and on the ticket.
  *   coverPhotoUrl  the flyer. Also shown on the sister event's form beside the
  *                  tick-box, so people see what they're signing up for. Leave
  *                  "" until there is one; the form shows the details instead.
  *
- * Usage: node scripts/seedFireNight.js            (writes both as draft)
+ * Usage: node scripts/seedFireNight.js            (leaves status alone; new docs are drafts)
  *        node scripts/seedFireNight.js --publish  (both go live)
+ *        node scripts/seedFireNight.js --draft    (both taken down)
  * Against the emulator: prefix with FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
  */
 const admin = require("firebase-admin");
@@ -29,9 +33,10 @@ admin.initializeApp({ projectId: "loveinc-ticketting" });
 const db = admin.firestore();
 const { FieldValue, Timestamp } = admin.firestore;
 
-async function upsert(slug, fields) {
+async function upsert(slug, fields, status) {
   const existing = await db.collection("events").where("slug", "==", slug).limit(1).get();
   const ref = existing.empty ? db.collection("events").doc() : existing.docs[0].ref;
+  if (status || existing.empty) fields = { ...fields, status: status || "draft" };
   // merge keeps staff-set fields (autoCheckIn, reminderSentAt) on a re-run.
   // `sessions` is cleared: an earlier version of this script made Fire Night
   // one event with both gatherings as sessions.
@@ -40,7 +45,13 @@ async function upsert(slug, fields) {
 }
 
 async function main() {
-  const status = process.argv.includes("--publish") ? "published" : "draft";
+  // Re-running to fix a detail must not quietly take live events down, so
+  // status only changes when asked for.
+  const status = process.argv.includes("--publish")
+    ? "published"
+    : process.argv.includes("--draft")
+      ? "draft"
+      : null;
   // Accra (and Kumasi) are UTC+0 year-round, so these are local times.
   const ts = (iso) => Timestamp.fromDate(new Date(iso));
 
@@ -50,15 +61,16 @@ async function main() {
       "A night of worship and prayer at the College of Engineering. Come ready to meet God.",
     coverPhotoUrl: "/events/fire-night/cover.jpg",
     startsAt: ts("2026-11-27T19:30:00Z"),
-    location: "Engineering Auditorium (Kumapley), Ground Floor, New Engineering Building",
-    // The auditorium's plus code on Google Maps.
-    mapQuery: "MCFP+22R, Kumasi",
-    locationUrl: "https://www.google.com/maps/search/?api=1&query=MCFP%2B22R%2C%20Kumasi",
+    // Word for word from the flyer.
+    location: "New Engineering Block, Ground Floor, Auditorium",
+    // The earlier pin (Kumapley Auditorium, MCFP+22R) was the wrong building.
+    mapQuery: FieldValue.delete(),
+    locationUrl: FieldValue.delete(),
     chapter: "knust",
     theme: "fire",
     companionSlug: "sunday-service",
-    status,
-  });
+    schoolDefault: "Tech",
+  }, status);
 
   const sunday = await upsert("sunday-service", {
     name: "Sunday Service",
@@ -69,10 +81,13 @@ async function main() {
     chapter: "knust",
     theme: "glow",
     companionSlug: "fire-night",
-    status,
-  });
+    schoolDefault: "Tech",
+  }, status);
 
-  console.log(`Seeded "fire-night" (${fireNight}) and "sunday-service" (${sunday}) as ${status}`);
+  console.log(
+    `Seeded "fire-night" (${fireNight}) and "sunday-service" (${sunday})` +
+      (status ? ` as ${status}` : " (status unchanged)")
+  );
 }
 
 main()

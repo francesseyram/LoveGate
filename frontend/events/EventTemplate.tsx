@@ -191,6 +191,7 @@ export default function EventTemplate({
             eventLocationUrl={event.locationUrl}
             sessions={sessions}
             companion={companion ?? undefined}
+            schoolDefault={event.schoolDefault}
             theme="revive"
           />
         </div>
