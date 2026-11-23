@@ -416,6 +416,11 @@ export function RegistrationForm({
             {sessions && sessions.length > 1
               ? sessions.map((session) => session.name).join(" + ")
               : `${eventName}${eventDate ? ` · ${eventDate}` : ""}`}
+            {/* Where to go, right where people sign up: the page has no map
+                while the venue's pin is unconfirmed. */}
+            {(!sessions || sessions.length <= 1) && eventLocation && (
+              <span className="mt-1 block">{eventLocation}</span>
+            )}
           </p>
 
           {bannerError && (

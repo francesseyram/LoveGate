@@ -46,6 +46,8 @@ function titleStyle(name: string): { words: string[]; stacked: boolean; style: C
  * back to sit on the dark page: roads go dark, water and parks keep their
  * colours roughly where they were.
  */
+// Kept for when the map comes back; its only use is commented out below.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function VenueMap({ query, venue }: { query: string; venue?: string }) {
   const q = encodeURIComponent(query);
   return (
@@ -174,7 +176,10 @@ export default function EventTemplate({
 
           <SessionTicket sessions={sessions} />
 
-          {event.mapQuery && <VenueMap query={event.mapQuery} venue={first.location} />}
+          {/* "Getting there" is switched off until the venue's Google Maps pin
+              is confirmed; the venue is shown on the form instead. Restore
+              this line to bring the map back.
+          {event.mapQuery && <VenueMap query={event.mapQuery} venue={first.location} />} */}
         </div>
       </section>
 
